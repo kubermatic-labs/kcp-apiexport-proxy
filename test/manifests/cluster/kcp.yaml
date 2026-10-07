@@ -1,0 +1,80 @@
+# Copyright The kcp-apiexport-proxy Authors.
+#
+# Licensed under the Apache License, Version 2.0 (the "License");
+# you may not use this file except in compliance with the License.
+# You may obtain a copy of the License at
+#
+#     http://www.apache.org/licenses/LICENSE-2.0
+#
+# Unless required by applicable law or agreed to in writing, software
+# distributed under the License is distributed on an "AS IS" BASIS,
+# WITHOUT WARRANTIES OR CONDITIONS OF ANY KIND, either express or implied.
+# See the License for the specific language governing permissions and
+# limitations under the License.
+
+# A single-shard kcp with embedded etcd. Its external hostname is the
+# Service's DNS name, so the virtual workspace URLs published in
+# APIExportEndpointSlices are reachable from within the kind cluster.
+apiVersion: v1
+kind: Namespace
+metadata:
+  name: kcp
+---
+apiVersion: v1
+kind: Service
+metadata:
+  name: kcp
+  namespace: kcp
+spec:
+  selector:
+    app: kcp
+  ports:
+    - name: https
+      port: 6443
+      targetPort: 6443
+---
+apiVersion: apps/v1
+kind: Deployment
+metadata:
+  name: kcp
+  namespace: kcp
+spec:
+  replicas: 1
+  selector:
+    matchLabels:
+      app: kcp
+  template:
+    metadata:
+      labels:
+        app: kcp
+    spec:
+      # Without a service account token, kubectl in the pod cannot fall back
+      # to the kind cluster's API server before kcp has written its
+      # admin.kubeconfig.
+      automountServiceAccountToken: false
+      securityContext:
+        fsGroup: 65532
+      containers:
+        - name: kcp
+          image: ghcr.io/kcp-dev/kcp:v0.32.5
+          args:
+            - start
+            - --root-directory=/.kcp
+            - --external-hostname=kcp.kcp.svc.cluster.local
+          env:
+            - name: KUBECONFIG
+              value: /.kcp/admin.kubeconfig
+          ports:
+            - name: https
+              containerPort: 6443
+          readinessProbe:
+            exec:
+              command: [kubectl, --kubeconfig=/.kcp/admin.kubeconfig, get, --raw, /readyz]
+            periodSeconds: 5
+            timeoutSeconds: 5
+          volumeMounts:
+            - name: data
+              mountPath: /.kcp
+      volumes:
+        - name: data
+          emptyDir: {}

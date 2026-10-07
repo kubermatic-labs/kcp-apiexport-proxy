@@ -21,8 +21,10 @@ TOOLS_DIR="${TOOLS_DIR:-$ROOT_DIR/_output/tools}"
 BOILERPLATE_VERSION="0.3.0"
 GIMPS_VERSION="0.6.2"
 GOLANGCI_LINT_VERSION="2.14.0"
-KCP_VERSION="0.32.5"
+KIND_VERSION="0.33.0"
+KIND_NODE_IMAGE="kindest/node:v1.36.4@sha256:099e049362a1526b2db71494e1947aae99bd16290d7c895f2b7ea312e3cbfaed"
 KUBECTL_VERSION="1.36.5"
+KYVERNO_VERSION="1.19.1"
 
 OS="$(uname -s | tr '[:upper:]' '[:lower:]')"
 ARCH="$(uname -m)"
@@ -103,10 +105,9 @@ ensure_golangci_lint() {
     "golangci-lint-${GOLANGCI_LINT_VERSION}-${OS}-${ARCH}/golangci-lint"
 }
 
-ensure_kcp() {
-  install_tool kcp "$KCP_VERSION" \
-    "https://github.com/kcp-dev/kcp/releases/download/v${KCP_VERSION}/kcp_${KCP_VERSION}_${OS}_${ARCH}.tar.gz" \
-    bin/kcp
+ensure_kind() {
+  install_tool kind "$KIND_VERSION" \
+    "https://github.com/kubernetes-sigs/kind/releases/download/v${KIND_VERSION}/kind-${OS}-${ARCH}"
 }
 
 ensure_kubectl() {
@@ -115,7 +116,7 @@ ensure_kubectl() {
 }
 
 # retry runs the given command until it succeeds, up to the given number of
-# attempts with a one second pause in between.
+# attempts with a two second pause in between.
 #
 # usage: retry <attempts> <command...>
 retry() {
@@ -127,7 +128,7 @@ retry() {
     if "$@"; then
       return 0
     fi
-    sleep 1
+    sleep 2
   done
 
   echodate "Command failed after $attempts attempts: $*" >&2

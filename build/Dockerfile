@@ -12,30 +12,10 @@
 # See the License for the specific language governing permissions and
 # limitations under the License.
 
-export CGO_ENABLED ?= 0
-export GOFLAGS ?= -mod=readonly -trimpath
+# Image for the proxy. The build context is expected to contain a prebuilt,
+# static linux kcp-apiexport-proxy binary, as produced by "make build".
+FROM gcr.io/distroless/static-debian12:nonroot
 
-BUILD_DEST ?= _output
-CMD ?= $(notdir $(wildcard ./cmd/*))
-GOBUILDFLAGS ?= -v
-LDFLAGS ?= -w -extldflags '-static'
+COPY kcp-apiexport-proxy /usr/local/bin/kcp-apiexport-proxy
 
-.PHONY: build
-build:
-	$(foreach cmd,$(CMD),go build $(GOBUILDFLAGS) -ldflags "$(LDFLAGS)" -o $(BUILD_DEST)/$(cmd) ./cmd/$(cmd) &&) true
-
-.PHONY: test
-test:
-	go test ./...
-
-.PHONY: test-integration
-test-integration:
-	./test/test-integration.sh
-
-.PHONY: verify
-verify:
-	./hack/verify-boilerplate.sh
-	./hack/verify-dependencies.sh
-	./hack/verify-unicode.sh
-	./hack/verify-import-order.sh
-	./hack/verify-lint.sh
+ENTRYPOINT ["/usr/local/bin/kcp-apiexport-proxy"]

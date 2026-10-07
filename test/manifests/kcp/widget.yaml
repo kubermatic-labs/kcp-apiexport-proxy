@@ -12,30 +12,11 @@
 # See the License for the specific language governing permissions and
 # limitations under the License.
 
-export CGO_ENABLED ?= 0
-export GOFLAGS ?= -mod=readonly -trimpath
-
-BUILD_DEST ?= _output
-CMD ?= $(notdir $(wildcard ./cmd/*))
-GOBUILDFLAGS ?= -v
-LDFLAGS ?= -w -extldflags '-static'
-
-.PHONY: build
-build:
-	$(foreach cmd,$(CMD),go build $(GOBUILDFLAGS) -ldflags "$(LDFLAGS)" -o $(BUILD_DEST)/$(cmd) ./cmd/$(cmd) &&) true
-
-.PHONY: test
-test:
-	go test ./...
-
-.PHONY: test-integration
-test-integration:
-	./test/test-integration.sh
-
-.PHONY: verify
-verify:
-	./hack/verify-boilerplate.sh
-	./hack/verify-dependencies.sh
-	./hack/verify-unicode.sh
-	./hack/verify-import-order.sh
-	./hack/verify-lint.sh
+# Applied in the root:consumer workspace, once the APIBinding is ready.
+apiVersion: example.com/v1
+kind: Widget
+metadata:
+  name: my-widget
+  namespace: default
+spec:
+  color: blue
