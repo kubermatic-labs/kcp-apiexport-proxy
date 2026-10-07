@@ -63,7 +63,7 @@ spec:
         http.Get('http://kcp-apiexport-proxy.kcp-system.svc.cluster.local:8080/clusters/'
           + variables.cluster + '/apis/apis.kcp.io/v1alpha1/apibindings')
   validations:
-    - expression: "variables.apiBindings.items.size() > 0"
+    - expression: "has(variables.apiBindings.items) && variables.apiBindings.items.size() > 0"
       message: >-
         Logical cluster referenced by the "kcp.io/cluster" annotation has no
         APIBindings for this APIExport (checked via kcp-apiexport-proxy at

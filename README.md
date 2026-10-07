@@ -26,10 +26,10 @@ to be reachable only from trusted in-cluster clients.
 | --- | --- |
 | `make build` | Builds the binaries in `cmd/` with the local Go toolchain into `_output/`. |
 | `make test` | Runs all unit tests. |
-| `make test-integration` | Builds the proxy, starts a local kcp, binds an example APIExport and checks requests through the proxy. Needs `curl` or `wget`. |
+| `make test-integration` | Runs [test/test-integration.sh](test/test-integration.sh), which deploys kcp, Kyverno and the proxy into a kind cluster and checks the proxy end to end. Needs Docker. |
 | `make verify` | Runs all `hack/verify-*.sh` scripts (boilerplate, dependencies, unicode, import order, lint). |
 
-Tools needed by the scripts (including kcp and kubectl) are downloaded on first use at the pinned
+Tools needed by the scripts (including kind and kubectl) are downloaded on first use at the pinned
 versions in [hack/lib.sh](hack/lib.sh) into `_output/tools/`.
 
 ## Usage
