@@ -20,12 +20,23 @@ stable URL through which they can reach any logical cluster bound to that
 The proxy serves plain HTTP and performs **no authentication**; it is meant
 to be reachable only from trusted in-cluster clients.
 
+## Development
+
+| Target | Description |
+| --- | --- |
+| `make build` | Builds the binaries in `cmd/` with the local Go toolchain into `_output/`. |
+| `make test` | Runs all unit tests. |
+| `make verify` | Runs all `hack/verify-*.sh` scripts (boilerplate, dependencies, unicode, import order, lint). |
+
+Tools needed by the verify scripts are downloaded on first use at the pinned
+versions in [hack/lib.sh](hack/lib.sh) into `_output/tools/`.
+
 ## Usage
 
 ```sh
-go build -o apiexport-proxy ./cmd/apiexport-proxy
+make build
 
-./apiexport-proxy \
+_output/apiexport-proxy \
   --kubeconfig=/path/to/kubeconfig \
   --apiexportendpointslice-name=my-export \
   --bind-address=:8080
