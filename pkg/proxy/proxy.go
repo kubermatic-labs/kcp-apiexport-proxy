@@ -43,23 +43,27 @@ func newTransport(identityConfig *rest.Config) (http.RoundTripper, error) {
 // newShardReverseProxy returns a reverse proxy whose destination is decided
 // per-request by lookup.ShardURLFrom.
 func newShardReverseProxy(transport http.RoundTripper) *httputil.ReverseProxy {
-	director := func(req *http.Request) {
-		shardURL := lookup.ShardURLFrom(req.Context())
+	rewrite := func(pr *httputil.ProxyRequest) {
+		// Rewrite, unlike the deprecated Director, does not add
+		// X-Forwarded-For by itself.
+		pr.SetXForwarded()
+
+		shardURL := lookup.ShardURLFrom(pr.In.Context())
 		if shardURL == nil {
 			// should not happen if wiring is correct
 			utilruntime.HandleError(fmt.Errorf("no shard URL found in request context"))
-			req.URL.Scheme = "https"
-			req.URL.Host = "notfound"
+			pr.Out.URL.Scheme = "https"
+			pr.Out.URL.Host = "notfound"
 			return
 		}
 
-		req.URL.Scheme = shardURL.Scheme
-		req.URL.Host = shardURL.Host
-		req.URL.Path = shardURL.Path
+		pr.Out.URL.Scheme = shardURL.Scheme
+		pr.Out.URL.Host = shardURL.Host
+		pr.Out.URL.Path = shardURL.Path
 	}
 
 	return &httputil.ReverseProxy{
-		Director:     director,
+		Rewrite:      rewrite,
 		Transport:    transport,
 		ErrorHandler: metrics.NewProxyErrorHandler(),
 	}

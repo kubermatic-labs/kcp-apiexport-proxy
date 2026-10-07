@@ -33,7 +33,7 @@ import (
 // requests against idx, storing the resolved shard virtual workspace URL in
 // the request context (see WithShardURL/ShardURLFrom) before calling
 // delegate. Requests for unknown clusters, or that don't match
-// "/clusters/...", get a 404 — this proxy performs no authentication or
+// "/clusters/...", get a 404 - this proxy performs no authentication or
 // authorization, so there's no "forbidden" framing to fall back to, unlike
 // upstream/pkg/proxy/lookup.
 func WithClusterResolver(delegate http.Handler, idx index.Index) http.Handler {

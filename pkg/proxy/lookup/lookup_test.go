@@ -84,7 +84,7 @@ func TestWithClusterResolver(t *testing.T) {
 	for _, tc := range tests {
 		t.Run(tc.name, func(t *testing.T) {
 			gotShardURL = ""
-			req := httptest.NewRequest(http.MethodGet, tc.path, nil)
+			req := httptest.NewRequestWithContext(t.Context(), http.MethodGet, tc.path, nil)
 			rec := httptest.NewRecorder()
 
 			handler.ServeHTTP(rec, req)
