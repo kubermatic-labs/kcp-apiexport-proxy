@@ -53,7 +53,7 @@ spec:
           imagePullPolicy: Never
           args:
             - --kubeconfig=/etc/kcp-apiexport-proxy/kubeconfig
-            - --apiexportendpointslice-name=example.com
+            - --apiexportendpointslice-names=example.com
             - --bind-address=:8080
           ports:
             - name: http

@@ -1,21 +1,22 @@
 # kcp-apiexport-proxy
 
 `kcp-apiexport-proxy` is a small reverse proxy that sits in front of the
-shard-specific virtual workspace endpoints of a single kcp `APIExport`. It
-gives clients (for example Kyverno policies using the
+shard-specific virtual workspace endpoints of one or more kcp `APIExports`.
+It gives clients (for example Kyverno policies using the
 [HTTP CEL library](https://kyverno.io/docs/policy-types/cel-libraries/)) one
-stable URL through which they can reach any logical cluster bound to that
-`APIExport`, regardless of which shard it lives on.
+stable URL through which they can reach any logical cluster bound to those
+`APIExports`, regardless of which shard it lives on.
 
 ## How it works
 
-1. Watches a named `APIExportEndpointSlice` for the set of per-shard virtual
-   workspace URLs.
-2. Watches `APIBindings` through each of those URLs and builds an index from
-   logical cluster name to virtual workspace URL.
-3. Forwards requests of the form `/clusters/<logical-cluster>/...` to the
+1. Watches each configured `APIExportEndpointSlice` for its set of per-shard
+   virtual workspace URLs.
+2. Watches `APIBindings` through each of those URLs and builds, per slice, an
+   index from logical cluster name to virtual workspace URL.
+3. Forwards requests of the form
+   `/apiexportendpointslices/<slice>/clusters/<logical-cluster>/...` to the
    right shard, using the identity from the configured kubeconfig. Requests
-   for unknown logical clusters get a `404`.
+   for unknown slices or logical clusters get a `404`.
 
 The proxy serves plain HTTP and performs **no authentication**; it is meant
 to be reachable only from trusted in-cluster clients.
@@ -39,23 +40,23 @@ make build
 
 _output/kcp-apiexport-proxy \
   --kubeconfig=/path/to/kubeconfig \
-  --apiexportendpointslice-name=my-export \
+  --apiexportendpointslice-names=my-export,my-other-export \
   --bind-address=:8080
 ```
 
 | Flag | Description |
 | --- | --- |
 | `--kubeconfig` | Kubeconfig whose current context points at the workspace containing the `APIExportEndpointSlice`; also used as the identity for all requests to shards. Required. |
-| `--apiexportendpointslice-name` | Name of the `APIExportEndpointSlice` to watch. Required. |
+| `--apiexportendpointslice-names` | Comma-separated names of the `APIExportEndpointSlices` to watch, all in the kubeconfig's workspace. Required. |
 | `--bind-address` | Listen address (default `:8080`). |
 
-Besides the proxied `/clusters/...` paths, the server exposes `/healthz`,
+Besides the proxied `/apiexportendpointslices/...` paths, the server exposes `/healthz`,
 `/readyz` and `/metrics`.
 
 Example request:
 
 ```sh
-curl http://localhost:8080/clusters/<logical-cluster>/apis/apis.kcp.io/v1alpha1/apibindings
+curl http://localhost:8080/apiexportendpointslices/my-export/clusters/<logical-cluster>/apis/apis.kcp.io/v1alpha1/apibindings
 ```
 
 A sample Kyverno `ValidatingPolicy` that uses the proxy can be found in

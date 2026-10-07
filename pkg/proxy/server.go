@@ -34,8 +34,10 @@ import (
 
 type Server struct {
 	CompletedConfig
-	Handler         http.Handler
-	IndexController *index.Controller
+	Handler http.Handler
+	// IndexControllers holds one index controller per watched
+	// APIExportEndpointSlice, keyed by the slice's name.
+	IndexControllers map[string]*index.Controller
 }
 
 func NewServer(c CompletedConfig) (*Server, error) {
@@ -43,11 +45,16 @@ func NewServer(c CompletedConfig) (*Server, error) {
 		CompletedConfig: c,
 	}
 
-	indexController, err := index.NewController(c.IdentityConfig, c.Options.APIExportEndpointSliceName)
-	if err != nil {
-		return nil, fmt.Errorf("failed to create index controller: %w", err)
+	s.IndexControllers = make(map[string]*index.Controller, len(c.Options.APIExportEndpointSliceNames))
+	indexes := make(map[string]index.Index, len(c.Options.APIExportEndpointSliceNames))
+	for _, name := range c.Options.APIExportEndpointSliceNames {
+		indexController, err := index.NewController(c.IdentityConfig, name)
+		if err != nil {
+			return nil, fmt.Errorf("failed to create index controller for APIExportEndpointSlice %q: %w", name, err)
+		}
+		s.IndexControllers[name] = indexController
+		indexes[name] = indexController
 	}
-	s.IndexController = indexController
 
 	transport, err := newTransport(c.IdentityConfig)
 	if err != nil {
@@ -55,7 +62,7 @@ func NewServer(c CompletedConfig) (*Server, error) {
 	}
 
 	var handler http.Handler = newShardReverseProxy(transport)
-	handler = lookup.WithClusterResolver(handler, indexController)
+	handler = lookup.WithClusterResolver(handler, indexes)
 	handler = metrics.WithLatencyTracking(handler)
 	handler = withPanicRecovery(handler)
 
@@ -65,7 +72,7 @@ func NewServer(c CompletedConfig) (*Server, error) {
 		w.WriteHeader(http.StatusOK)
 	})
 	mux.HandleFunc("/readyz", func(w http.ResponseWriter, _ *http.Request) {
-		if !indexController.HasSynced() {
+		if !s.hasSynced() {
 			http.Error(w, "index not synced", http.StatusServiceUnavailable)
 			return
 		}
@@ -75,6 +82,17 @@ func NewServer(c CompletedConfig) (*Server, error) {
 	s.Handler = mux
 
 	return s, nil
+}
+
+// hasSynced reports, without blocking, whether the APIExportEndpointSlice
+// informers of all index controllers have synced at least once.
+func (s *Server) hasSynced() bool {
+	for _, indexController := range s.IndexControllers {
+		if !indexController.HasSynced() {
+			return false
+		}
+	}
+	return true
 }
 
 // withPanicRecovery recovers from panics in delegate, logging them and
@@ -106,10 +124,12 @@ func (s *Server) PrepareRun(context.Context) (preparedServer, error) {
 func (s preparedServer) Run(ctx context.Context) error {
 	logger := klog.FromContext(ctx).WithValues("component", "kcp-apiexport-proxy")
 
-	go s.IndexController.Start(ctx)
+	for _, indexController := range s.IndexControllers {
+		go indexController.Start(ctx)
+	}
 
-	if !cache.WaitForCacheSync(ctx.Done(), s.IndexController.HasSynced) {
-		return fmt.Errorf("failed to sync APIExportEndpointSlice informer")
+	if !cache.WaitForCacheSync(ctx.Done(), s.hasSynced) {
+		return fmt.Errorf("failed to sync APIExportEndpointSlice informers")
 	}
 
 	httpServer := &http.Server{

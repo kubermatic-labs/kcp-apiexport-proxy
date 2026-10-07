@@ -29,9 +29,9 @@ type Options struct {
 	// lives) and the identity used for every outbound request to shards.
 	Kubeconfig string
 
-	// APIExportEndpointSliceName is the name of the APIExportEndpointSlice
-	// to watch.
-	APIExportEndpointSliceName string
+	// APIExportEndpointSliceNames are the names of the
+	// APIExportEndpointSlices to watch. They all live in the home cluster.
+	APIExportEndpointSliceNames []string
 
 	// BindAddress is the address the plain-HTTP proxy listens on.
 	BindAddress string
@@ -47,8 +47,9 @@ func (o *Options) AddFlags(fs *pflag.FlagSet) {
 	fs.StringVar(&o.Kubeconfig, "kubeconfig", o.Kubeconfig,
 		"The path to the kubeconfig used both to locate the APIExportEndpointSlice (via its current "+
 			"context) and as the identity forwarded to every shard.")
-	fs.StringVar(&o.APIExportEndpointSliceName, "apiexportendpointslice-name", o.APIExportEndpointSliceName,
-		"The name of the APIExportEndpointSlice to watch for shard virtual workspace URLs.")
+	fs.StringSliceVar(&o.APIExportEndpointSliceNames, "apiexportendpointslice-names", o.APIExportEndpointSliceNames,
+		"Comma-separated names of the APIExportEndpointSlices to watch for shard virtual workspace URLs. "+
+			"Requests are proxied under /apiexportendpointslices/<name>/clusters/<logical_cluster>/....")
 	fs.StringVar(&o.BindAddress, "bind-address", o.BindAddress,
 		"The address the proxy listens on. The proxy serves plain HTTP and performs no authentication.")
 }
@@ -63,8 +64,19 @@ func (o *Options) Validate() []error {
 	if o.Kubeconfig == "" {
 		errs = append(errs, fmt.Errorf("--kubeconfig is required"))
 	}
-	if o.APIExportEndpointSliceName == "" {
-		errs = append(errs, fmt.Errorf("--apiexportendpointslice-name is required"))
+	if len(o.APIExportEndpointSliceNames) == 0 {
+		errs = append(errs, fmt.Errorf("--apiexportendpointslice-names is required"))
+	}
+
+	seen := make(map[string]bool, len(o.APIExportEndpointSliceNames))
+	for _, name := range o.APIExportEndpointSliceNames {
+		switch {
+		case name == "":
+			errs = append(errs, fmt.Errorf("--apiexportendpointslice-names must not contain empty names"))
+		case seen[name]:
+			errs = append(errs, fmt.Errorf("--apiexportendpointslice-names contains %q more than once", name))
+		}
+		seen[name] = true
 	}
 
 	return errs

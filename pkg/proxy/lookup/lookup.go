@@ -29,27 +29,36 @@ import (
 	"github.com/kcp-dev/contrib-apiexport-proxy/pkg/proxy/index"
 )
 
-// WithClusterResolver resolves the {cluster} in "/clusters/{cluster}/..."
-// requests against idx, storing the resolved shard virtual workspace URL in
-// the request context (see WithShardURL/ShardURLFrom) before calling
-// delegate. Requests for unknown clusters, or that don't match
-// "/clusters/...", get a 404 - this proxy performs no authentication or
-// authorization, so there's no "forbidden" framing to fall back to, unlike
-// upstream/pkg/proxy/lookup.
-func WithClusterResolver(delegate http.Handler, idx index.Index) http.Handler {
+// WithClusterResolver resolves the {slice} and {cluster} in
+// "/apiexportendpointslices/{slice}/clusters/{cluster}/..." requests against
+// the index of the named APIExportEndpointSlice in indexes, storing the
+// resolved shard virtual workspace URL in the request context (see
+// WithShardURL/ShardURLFrom) before calling delegate. Requests for unknown
+// slices or clusters, or that don't match that path, get a 404 - this proxy
+// performs no authentication or authorization, so there's no "forbidden"
+// framing to fall back to, unlike upstream/pkg/proxy/lookup.
+func WithClusterResolver(delegate http.Handler, indexes map[string]index.Index) http.Handler {
 	mux := http.NewServeMux()
 
-	resolveHandler := newClusterResolveHandler(delegate, idx)
-	mux.HandleFunc("/clusters/{cluster}", resolveHandler)
-	mux.HandleFunc("/clusters/{cluster}/{trail...}", resolveHandler)
+	resolveHandler := newClusterResolveHandler(delegate, indexes)
+	mux.HandleFunc("/apiexportendpointslices/{slice}/clusters/{cluster}", resolveHandler)
+	mux.HandleFunc("/apiexportendpointslices/{slice}/clusters/{cluster}/{trail...}", resolveHandler)
 
 	return mux
 }
 
-func newClusterResolveHandler(delegate http.Handler, idx index.Index) http.HandlerFunc {
+func newClusterResolveHandler(delegate http.Handler, indexes map[string]index.Index) http.HandlerFunc {
 	return func(w http.ResponseWriter, req *http.Request) {
+		sliceName := req.PathValue("slice")
 		clusterName := req.PathValue("cluster")
-		logger := klog.FromContext(req.Context()).WithValues("cluster", clusterName)
+		logger := klog.FromContext(req.Context()).WithValues("slice", sliceName, "cluster", clusterName)
+
+		idx, found := indexes[sliceName]
+		if !found {
+			logger.V(4).Info("unknown APIExportEndpointSlice")
+			http.NotFound(w, req)
+			return
+		}
 
 		if clusterName == "" || clusterName == "*" {
 			// Only concrete logical cluster names are resolvable; this

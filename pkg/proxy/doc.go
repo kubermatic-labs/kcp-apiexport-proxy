@@ -15,10 +15,11 @@ limitations under the License.
 */
 
 // Package proxy provides an unauthenticated reverse proxy that sits in front
-// of the shard-specific virtual workspace endpoints of a single kcp
-// APIExport. It watches a named APIExportEndpointSlice for the set of
+// of the shard-specific virtual workspace endpoints of one or more kcp
+// APIExports. For each named APIExportEndpointSlice it watches the set of
 // per-shard virtual workspace URLs, watches APIBindings through each of
 // those URLs to learn which logical cluster lives behind which URL, and
-// forwards requests of the form /clusters/<logical_cluster>/... to the
+// forwards requests of the form
+// /apiexportendpointslices/<slice>/clusters/<logical_cluster>/... to the
 // right shard using the identity of a single configured kubeconfig.
 package proxy
