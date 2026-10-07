@@ -24,6 +24,8 @@ import (
 	"testing"
 
 	"github.com/kcp-dev/logicalcluster/v3"
+
+	"github.com/kcp-dev/contrib-apiexport-proxy/pkg/proxy/index"
 )
 
 type fakeIndex map[string]string
@@ -34,8 +36,13 @@ func (f fakeIndex) LookupURL(cluster logicalcluster.Name) (string, bool) {
 }
 
 func TestWithClusterResolver(t *testing.T) {
-	idx := fakeIndex{
-		"1abc": "https://shard-a.example.com/services/apiexport/foo/bar",
+	indexes := map[string]index.Index{
+		"bar": fakeIndex{
+			"1abc": "https://shard-a.example.com/services/apiexport/foo/bar",
+		},
+		"baz": fakeIndex{
+			"2def": "https://shard-b.example.com/services/apiexport/foo/baz",
+		},
 	}
 
 	var gotShardURL string
@@ -46,7 +53,7 @@ func TestWithClusterResolver(t *testing.T) {
 		w.WriteHeader(http.StatusOK)
 	})
 
-	handler := WithClusterResolver(delegate, idx)
+	handler := WithClusterResolver(delegate, indexes)
 
 	tests := []struct {
 		name       string
@@ -56,24 +63,45 @@ func TestWithClusterResolver(t *testing.T) {
 	}{
 		{
 			name:       "known cluster with trail",
-			path:       "/clusters/1abc/apis/foo.example.com/v1/widgets",
+			path:       "/apiexportendpointslices/bar/clusters/1abc/apis/foo.example.com/v1/widgets",
 			wantStatus: http.StatusOK,
 			wantURL:    "https://shard-a.example.com/services/apiexport/foo/bar/clusters/1abc/apis/foo.example.com/v1/widgets",
 		},
 		{
 			name:       "known cluster without trail",
-			path:       "/clusters/1abc",
+			path:       "/apiexportendpointslices/bar/clusters/1abc",
 			wantStatus: http.StatusOK,
 			wantURL:    "https://shard-a.example.com/services/apiexport/foo/bar/clusters/1abc",
 		},
 		{
+			name:       "known cluster of another slice",
+			path:       "/apiexportendpointslices/baz/clusters/2def/api/v1",
+			wantStatus: http.StatusOK,
+			wantURL:    "https://shard-b.example.com/services/apiexport/foo/baz/clusters/2def/api/v1",
+		},
+		{
+			name:       "cluster only known to another slice",
+			path:       "/apiexportendpointslices/baz/clusters/1abc/api/v1",
+			wantStatus: http.StatusNotFound,
+		},
+		{
+			name:       "unknown slice",
+			path:       "/apiexportendpointslices/unknown/clusters/1abc/api/v1",
+			wantStatus: http.StatusNotFound,
+		},
+		{
 			name:       "unknown cluster",
-			path:       "/clusters/unknown/apis",
+			path:       "/apiexportendpointslices/bar/clusters/unknown/apis",
 			wantStatus: http.StatusNotFound,
 		},
 		{
 			name:       "wildcard cluster is rejected",
-			path:       "/clusters/*/apis",
+			path:       "/apiexportendpointslices/bar/clusters/*/apis",
+			wantStatus: http.StatusNotFound,
+		},
+		{
+			name:       "path without slice",
+			path:       "/clusters/1abc/apis",
 			wantStatus: http.StatusNotFound,
 		},
 		{
@@ -136,9 +164,9 @@ func TestWithClusterResolverEndpointURLs(t *testing.T) {
 				}
 				w.WriteHeader(http.StatusOK)
 			})
-			handler := WithClusterResolver(delegate, fakeIndex{"1abc": tc.endpointURL})
+			handler := WithClusterResolver(delegate, map[string]index.Index{"bar": fakeIndex{"1abc": tc.endpointURL}})
 
-			req := httptest.NewRequestWithContext(t.Context(), http.MethodGet, "/clusters/1abc/api/v1", nil)
+			req := httptest.NewRequestWithContext(t.Context(), http.MethodGet, "/apiexportendpointslices/bar/clusters/1abc/api/v1", nil)
 			rec := httptest.NewRecorder()
 			handler.ServeHTTP(rec, req)
 

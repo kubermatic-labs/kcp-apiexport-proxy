@@ -36,7 +36,7 @@ spec:
       expression: "object.metadata.?annotations[?'kcp.io/cluster'].orValue('')"
     - name: apiBindings
       expression: >-
-        http.Get('http://kcp-apiexport-proxy.kcp-apiexport-proxy.svc.cluster.local:8080/clusters/'
+        http.Get('http://kcp-apiexport-proxy.kcp-apiexport-proxy.svc.cluster.local:8080/apiexportendpointslices/example.com/clusters/'
           + variables.cluster + '/apis/apis.kcp.io/v1alpha1/apibindings')
   validations:
     - expression: "has(variables.apiBindings.items) && variables.apiBindings.items.size() > 0"

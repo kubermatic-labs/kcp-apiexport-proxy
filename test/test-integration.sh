@@ -149,9 +149,10 @@ kubectl -n kcp-apiexport-proxy create secret generic kcp-apiexport-proxy-kubecon
 kubectl -n kcp-apiexport-proxy rollout status deployment/kcp-apiexport-proxy --timeout=120s
 
 # proxy_get <path> sends a GET request to the proxy through the kind
-# cluster's API server service proxy.
+# cluster's API server service proxy. <path> is relative to the
+# example.com APIExportEndpointSlice.
 proxy_get() {
-  kubectl get --raw "/api/v1/namespaces/kcp-apiexport-proxy/services/http:kcp-apiexport-proxy:http/proxy$1"
+  kubectl get --raw "/api/v1/namespaces/kcp-apiexport-proxy/services/http:kcp-apiexport-proxy:http/proxy/apiexportendpointslices/example.com$1"
 }
 
 # expect_through_proxy <path> <string> checks that GET <path> through the

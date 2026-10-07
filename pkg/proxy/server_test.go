@@ -32,17 +32,21 @@ import (
 	proxyoptions "github.com/kcp-dev/contrib-apiexport-proxy/pkg/proxy/options"
 )
 
-// newTestFakeKCP returns a fake kcp with a single shard at /shard-a serving
-// logical cluster 1abc. Requests to that shard's virtual workspace that the
-// fake doesn't serve itself are echoed back with their path.
+// newTestFakeKCP returns a fake kcp with two APIExportEndpointSlices: slice-a
+// with a shard at /shard-a serving logical cluster 1abc, and slice-b with a
+// shard at /shard-b serving logical cluster 2def. Requests to the shards'
+// virtual workspaces that the fake doesn't serve itself are echoed back with
+// their path.
 func newTestFakeKCP(t *testing.T) *fakekcp.Server {
 	t.Helper()
 
 	fake := fakekcp.New()
 	t.Cleanup(fake.Close)
 
-	fake.AddEndpointSlice("the-slice", "/shard-a")
+	fake.AddEndpointSlice("slice-a", "/shard-a")
 	fake.AddBinding("/shard-a", "1abc", "binding")
+	fake.AddEndpointSlice("slice-b", "/shard-b")
+	fake.AddBinding("/shard-b", "2def", "binding")
 	fake.SetFallback(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
 		_, _ = io.WriteString(w, r.URL.RequestURI())
 	}))
@@ -54,7 +58,7 @@ func newTestServer(t *testing.T, fake *fakekcp.Server, bindAddress string) *Serv
 	t.Helper()
 
 	opts := proxyoptions.NewOptions()
-	opts.APIExportEndpointSliceName = "the-slice"
+	opts.APIExportEndpointSliceNames = []string{"slice-a", "slice-b"}
 	opts.BindAddress = bindAddress
 
 	c := &Config{Options: opts, ExtraConfig: ExtraConfig{IdentityConfig: &rest.Config{Host: fake.URL}}}
@@ -91,17 +95,20 @@ func TestNewServerHandler(t *testing.T) {
 	if rec := get(t, s.Handler, "/metrics"); rec.Code != http.StatusOK {
 		t.Fatalf("/metrics: got status %d, want %d", rec.Code, http.StatusOK)
 	}
-	if rec := get(t, s.Handler, "/clusters/1abc/api/v1/configmaps"); rec.Code != http.StatusNotFound {
+	if rec := get(t, s.Handler, "/apiexportendpointslices/slice-a/clusters/1abc/api/v1/configmaps"); rec.Code != http.StatusNotFound {
 		t.Fatalf("cluster request before sync: got status %d, want %d", rec.Code, http.StatusNotFound)
 	}
 
 	ctx, cancel := context.WithTimeout(t.Context(), 10*time.Second)
 	defer cancel()
-	go s.IndexController.Start(ctx)
+	for _, indexController := range s.IndexControllers {
+		go indexController.Start(ctx)
+	}
 
 	err := wait.PollUntilContextCancel(ctx, 10*time.Millisecond, true, func(context.Context) (bool, error) {
-		_, found := s.IndexController.LookupURL("1abc")
-		return found && s.IndexController.HasSynced(), nil
+		_, foundA := s.IndexControllers["slice-a"].LookupURL("1abc")
+		_, foundB := s.IndexControllers["slice-b"].LookupURL("2def")
+		return foundA && foundB && s.hasSynced(), nil
 	})
 	if err != nil {
 		t.Fatalf("index did not converge: %v", err)
@@ -111,22 +118,46 @@ func TestNewServerHandler(t *testing.T) {
 		t.Fatalf("/readyz after sync: got status %d, want %d", rec.Code, http.StatusOK)
 	}
 
-	rec := get(t, s.Handler, "/clusters/1abc/api/v1/configmaps?limit=10")
-	if rec.Code != http.StatusOK {
-		t.Fatalf("cluster request: got status %d, want %d", rec.Code, http.StatusOK)
+	tests := []struct {
+		path    string
+		wantURI string
+	}{
+		{
+			path:    "/apiexportendpointslices/slice-a/clusters/1abc/api/v1/configmaps?limit=10",
+			wantURI: "/shard-a/clusters/1abc/api/v1/configmaps?limit=10",
+		},
+		{
+			path:    "/apiexportendpointslices/slice-b/clusters/2def/api/v1/configmaps",
+			wantURI: "/shard-b/clusters/2def/api/v1/configmaps",
+		},
 	}
-	if got, want := rec.Body.String(), "/shard-a/clusters/1abc/api/v1/configmaps?limit=10"; got != want {
-		t.Fatalf("cluster request: got upstream URI %q, want %q", got, want)
+	for _, tc := range tests {
+		rec := get(t, s.Handler, tc.path)
+		if rec.Code != http.StatusOK {
+			t.Fatalf("%s: got status %d, want %d", tc.path, rec.Code, http.StatusOK)
+		}
+		if got := rec.Body.String(); got != tc.wantURI {
+			t.Fatalf("%s: got upstream URI %q, want %q", tc.path, got, tc.wantURI)
+		}
 	}
 
-	if rec := get(t, s.Handler, "/clusters/unknown/api/v1/configmaps"); rec.Code != http.StatusNotFound {
-		t.Fatalf("unknown cluster: got status %d, want %d", rec.Code, http.StatusNotFound)
+	for _, path := range []string{
+		"/apiexportendpointslices/slice-a/clusters/unknown/api/v1/configmaps",
+		"/apiexportendpointslices/slice-a/clusters/2def/api/v1/configmaps",
+		"/apiexportendpointslices/unknown/clusters/1abc/api/v1/configmaps",
+	} {
+		if rec := get(t, s.Handler, path); rec.Code != http.StatusNotFound {
+			t.Fatalf("%s: got status %d, want %d", path, rec.Code, http.StatusNotFound)
+		}
 	}
 }
 
 func TestNewServerInvalidIdentity(t *testing.T) {
+	opts := proxyoptions.NewOptions()
+	opts.APIExportEndpointSliceNames = []string{"slice-a"}
+
 	c := &Config{
-		Options: proxyoptions.NewOptions(),
+		Options: opts,
 		ExtraConfig: ExtraConfig{IdentityConfig: &rest.Config{
 			Host:            "https://kcp.example.com",
 			TLSClientConfig: rest.TLSClientConfig{CAData: []byte("not a certificate")},

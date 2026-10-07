@@ -17,6 +17,7 @@ limitations under the License.
 package options
 
 import (
+	"reflect"
 	"testing"
 
 	"github.com/spf13/pflag"
@@ -28,8 +29,8 @@ func TestNewOptionsDefaults(t *testing.T) {
 	if o.BindAddress != ":8080" {
 		t.Fatalf("got bind address %q, want %q", o.BindAddress, ":8080")
 	}
-	if o.Kubeconfig != "" || o.APIExportEndpointSliceName != "" {
-		t.Fatalf("expected kubeconfig and slice name to be empty by default, got %+v", o)
+	if o.Kubeconfig != "" || len(o.APIExportEndpointSliceNames) != 0 {
+		t.Fatalf("expected kubeconfig and slice names to be empty by default, got %+v", o)
 	}
 }
 
@@ -40,7 +41,7 @@ func TestAddFlags(t *testing.T) {
 
 	err := fs.Parse([]string{
 		"--kubeconfig=/tmp/kubeconfig",
-		"--apiexportendpointslice-name=my-slice",
+		"--apiexportendpointslice-names=slice-a,slice-b",
 		"--bind-address=127.0.0.1:9090",
 	})
 	if err != nil {
@@ -48,11 +49,11 @@ func TestAddFlags(t *testing.T) {
 	}
 
 	want := Options{
-		Kubeconfig:                 "/tmp/kubeconfig",
-		APIExportEndpointSliceName: "my-slice",
-		BindAddress:                "127.0.0.1:9090",
+		Kubeconfig:                  "/tmp/kubeconfig",
+		APIExportEndpointSliceNames: []string{"slice-a", "slice-b"},
+		BindAddress:                 "127.0.0.1:9090",
 	}
-	if *o != want {
+	if !reflect.DeepEqual(*o, want) {
 		t.Fatalf("got %+v, want %+v", *o, want)
 	}
 }
@@ -67,20 +68,23 @@ func TestValidate(t *testing.T) {
 	tests := []struct {
 		name       string
 		kubeconfig string
-		sliceName  string
+		sliceNames []string
 		wantErrs   int
 	}{
-		{name: "valid", kubeconfig: "/tmp/kubeconfig", sliceName: "my-slice", wantErrs: 0},
-		{name: "missing kubeconfig", sliceName: "my-slice", wantErrs: 1},
-		{name: "missing slice name", kubeconfig: "/tmp/kubeconfig", wantErrs: 1},
+		{name: "valid", kubeconfig: "/tmp/kubeconfig", sliceNames: []string{"my-slice"}, wantErrs: 0},
+		{name: "valid with multiple slices", kubeconfig: "/tmp/kubeconfig", sliceNames: []string{"slice-a", "slice-b"}, wantErrs: 0},
+		{name: "missing kubeconfig", sliceNames: []string{"my-slice"}, wantErrs: 1},
+		{name: "missing slice names", kubeconfig: "/tmp/kubeconfig", wantErrs: 1},
 		{name: "missing both", wantErrs: 2},
+		{name: "empty slice name", kubeconfig: "/tmp/kubeconfig", sliceNames: []string{"slice-a", ""}, wantErrs: 1},
+		{name: "duplicate slice name", kubeconfig: "/tmp/kubeconfig", sliceNames: []string{"slice-a", "slice-a"}, wantErrs: 1},
 	}
 
 	for _, tc := range tests {
 		t.Run(tc.name, func(t *testing.T) {
 			o := NewOptions()
 			o.Kubeconfig = tc.kubeconfig
-			o.APIExportEndpointSliceName = tc.sliceName
+			o.APIExportEndpointSliceNames = tc.sliceNames
 
 			if errs := o.Validate(); len(errs) != tc.wantErrs {
 				t.Fatalf("got %d errors (%v), want %d", len(errs), errs, tc.wantErrs)

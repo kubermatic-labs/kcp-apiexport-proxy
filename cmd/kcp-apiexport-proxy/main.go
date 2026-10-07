@@ -52,12 +52,13 @@ func NewProxyCommand() *cobra.Command {
 
 	cmd := &cobra.Command{
 		Use:   "kcp-apiexport-proxy",
-		Short: "Unauthenticated reverse proxy for a kcp APIExport's virtual workspace endpoints",
-		Long: `kcp-apiexport-proxy watches a named APIExportEndpointSlice for its shard virtual
-workspace URLs, watches APIBindings through each of them to learn which
-logical cluster lives behind which shard, and forwards
-/clusters/<logical_cluster>/... requests to the right shard using the
-identity of a single configured kubeconfig. It performs no authentication.`,
+		Short: "Unauthenticated reverse proxy for kcp APIExports' virtual workspace endpoints",
+		Long: `kcp-apiexport-proxy watches the named APIExportEndpointSlices for their shard
+virtual workspace URLs, watches APIBindings through each of them to learn
+which logical cluster lives behind which shard, and forwards
+/apiexportendpointslices/<slice>/clusters/<logical_cluster>/... requests to
+the right shard using the identity of a single configured kubeconfig. It
+performs no authentication.`,
 		SilenceUsage: true,
 		RunE: func(cmd *cobra.Command, _ []string) error {
 			if err := options.Complete(); err != nil {

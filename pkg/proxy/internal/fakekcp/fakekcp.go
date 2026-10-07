@@ -135,14 +135,15 @@ func (s *Server) serveHTTP(w http.ResponseWriter, r *http.Request) {
 
 	switch {
 	case r.URL.Path == slicesPath:
+		slices := s.slicesMatching(r.URL.Query().Get("fieldSelector"))
 		list := &apisv1alpha1.APIExportEndpointSliceList{
 			TypeMeta: metav1.TypeMeta{APIVersion: apisv1alpha1.SchemeGroupVersion.String(), Kind: "APIExportEndpointSliceList"},
 			ListMeta: metav1.ListMeta{ResourceVersion: resourceVersion},
-			Items:    s.slices,
+			Items:    slices,
 		}
 		var items []runtime.Object
-		for i := range s.slices {
-			items = append(items, &s.slices[i])
+		for i := range slices {
+			items = append(items, &slices[i])
 		}
 		bookmark := &apisv1alpha1.APIExportEndpointSlice{TypeMeta: metav1.TypeMeta{APIVersion: apisv1alpha1.SchemeGroupVersion.String(), Kind: "APIExportEndpointSlice"}}
 		s.serveListOrWatch(w, r, list, items, bookmark)
@@ -170,6 +171,24 @@ func (s *Server) serveHTTP(w http.ResponseWriter, r *http.Request) {
 	default:
 		http.NotFound(w, r)
 	}
+}
+
+// slicesMatching returns the APIExportEndpointSlices matching fieldSelector,
+// which may be empty or select on metadata.name only. s.lock must be held by
+// the caller.
+func (s *Server) slicesMatching(fieldSelector string) []apisv1alpha1.APIExportEndpointSlice {
+	name, found := strings.CutPrefix(fieldSelector, "metadata.name=")
+	if !found {
+		return s.slices
+	}
+
+	var slices []apisv1alpha1.APIExportEndpointSlice
+	for _, slice := range s.slices {
+		if slice.Name == name {
+			slices = append(slices, slice)
+		}
+	}
+	return slices
 }
 
 type watchEvent struct {
