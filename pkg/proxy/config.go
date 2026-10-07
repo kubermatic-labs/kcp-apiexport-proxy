@@ -19,11 +19,10 @@ package proxy
 import (
 	"fmt"
 
+	"k8s.io/client-go/rest"
 	"k8s.io/client-go/tools/clientcmd"
 
 	proxyoptions "github.com/kcp-dev/contrib-apiexport-proxy/pkg/proxy/options"
-
-	"k8s.io/client-go/rest"
 )
 
 type Config struct {
