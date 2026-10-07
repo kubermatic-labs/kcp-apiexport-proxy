@@ -17,13 +17,18 @@ limitations under the License.
 package index
 
 import (
+	"context"
 	"testing"
+	"time"
 
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
+	"k8s.io/apimachinery/pkg/util/wait"
 	"k8s.io/client-go/rest"
 
 	"github.com/kcp-dev/logicalcluster/v3"
 	apisv1alpha1 "github.com/kcp-dev/sdk/apis/apis/v1alpha1"
+
+	"github.com/kcp-dev/contrib-apiexport-proxy/pkg/proxy/internal/fakekcp"
 )
 
 func newTestController() *Controller {
@@ -148,5 +153,109 @@ func TestSyncEndpointsStartsAndStopsPerURLInformers(t *testing.T) {
 	c.syncEndpoints(&apisv1alpha1.APIExportEndpointSlice{})
 	if len(c.urlBindingInformers) != 0 {
 		t.Fatalf("got %d informers after removing all endpoints, want 0", len(c.urlBindingInformers))
+	}
+}
+
+func TestUpsertAndDeleteBindingIgnoreNonBindings(t *testing.T) {
+	c := newTestController()
+
+	c.upsertBinding(&apisv1alpha1.APIExport{}, "https://shard-a.example.com/services/apiexport/foo")
+	if len(c.clusterURLs) != 0 {
+		t.Fatalf("expected no entries to be recorded for a non-APIBinding object")
+	}
+
+	c.clusterURLs["1abc"] = "https://shard-a.example.com/services/apiexport/foo"
+	c.deleteBinding(&apisv1alpha1.APIExport{}, "https://shard-a.example.com/services/apiexport/foo")
+	c.deleteBinding(&apisv1alpha1.APIBinding{}, "https://shard-a.example.com/services/apiexport/foo")
+	if _, found := c.LookupURL("1abc"); !found {
+		t.Fatalf("entry evicted by deleting a non-APIBinding or unannotated binding")
+	}
+}
+
+func TestLookupURLUnknownCluster(t *testing.T) {
+	c := newTestController()
+
+	if url, found := c.LookupURL("1abc"); found || url != "" {
+		t.Fatalf("got (%q, %v) for an unknown cluster, want (\"\", false)", url, found)
+	}
+}
+
+func TestSyncEndpointsKeepsExistingInformers(t *testing.T) {
+	c, err := NewController(&rest.Config{Host: "https://127.0.0.1:0"}, "the-slice")
+	if err != nil {
+		t.Fatalf("NewController: %v", err)
+	}
+
+	const shardAURL = "https://shard-a.example.com/services/apiexport/foo"
+	slice := &apisv1alpha1.APIExportEndpointSlice{
+		Status: apisv1alpha1.APIExportEndpointSliceStatus{
+			APIExportEndpoints: []apisv1alpha1.APIExportEndpoint{{URL: shardAURL}},
+		},
+	}
+
+	c.syncEndpoints(slice)
+	informer := c.urlBindingInformers[shardAURL]
+	c.syncEndpoints(slice)
+
+	if len(c.urlBindingInformers) != 1 {
+		t.Fatalf("got %d informers, want 1", len(c.urlBindingInformers))
+	}
+	if c.urlBindingInformers[shardAURL] != informer {
+		t.Fatalf("expected the existing informer to be kept on resync")
+	}
+
+	c.syncEndpoints(&apisv1alpha1.APIExportEndpointSlice{})
+}
+
+func TestControllerAgainstFakeKCP(t *testing.T) {
+	fake := fakekcp.New()
+	defer fake.Close()
+
+	fake.AddEndpointSlice("the-slice", "/shard-a", "/shard-b")
+	fake.AddBinding("/shard-a", "1abc", "binding-a")
+	fake.AddBinding("/shard-b", "1def", "binding-b")
+
+	c, err := NewController(&rest.Config{Host: fake.URL}, "the-slice")
+	if err != nil {
+		t.Fatalf("NewController: %v", err)
+	}
+	if c.HasSynced() {
+		t.Fatalf("expected HasSynced to be false before Start")
+	}
+
+	ctx, cancel := context.WithCancel(t.Context())
+	stopped := make(chan struct{})
+	go func() {
+		defer close(stopped)
+		c.Start(ctx)
+	}()
+
+	syncCtx, syncCancel := context.WithTimeout(ctx, 10*time.Second)
+	defer syncCancel()
+	if !c.WaitForCacheSync(syncCtx.Done()) {
+		t.Fatalf("APIExportEndpointSlice informer did not sync")
+	}
+
+	want := map[logicalcluster.Name]string{
+		"1abc": fake.ShardURL("/shard-a"),
+		"1def": fake.ShardURL("/shard-b"),
+	}
+	err = wait.PollUntilContextCancel(syncCtx, 10*time.Millisecond, true, func(context.Context) (bool, error) {
+		for cluster, url := range want {
+			if got, _ := c.LookupURL(cluster); got != url {
+				return false, nil
+			}
+		}
+		return true, nil
+	})
+	if err != nil {
+		t.Fatalf("index did not converge: %v", err)
+	}
+
+	cancel()
+	select {
+	case <-stopped:
+	case <-time.After(10 * time.Second):
+		t.Fatalf("Start did not return after the context was cancelled")
 	}
 }

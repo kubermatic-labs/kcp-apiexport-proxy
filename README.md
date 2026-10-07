@@ -1,6 +1,6 @@
 # kcp-apiexport-proxy
 
-`apiexport-proxy` is a small reverse proxy that sits in front of the
+`kcp-apiexport-proxy` is a small reverse proxy that sits in front of the
 shard-specific virtual workspace endpoints of a single kcp `APIExport`. It
 gives clients (for example Kyverno policies using the
 [HTTP CEL library](https://kyverno.io/docs/policy-types/cel-libraries/)) one
@@ -26,9 +26,10 @@ to be reachable only from trusted in-cluster clients.
 | --- | --- |
 | `make build` | Builds the binaries in `cmd/` with the local Go toolchain into `_output/`. |
 | `make test` | Runs all unit tests. |
+| `make test-integration` | Builds the proxy, starts a local kcp, binds an example APIExport and checks requests through the proxy. Needs `curl` or `wget`. |
 | `make verify` | Runs all `hack/verify-*.sh` scripts (boilerplate, dependencies, unicode, import order, lint). |
 
-Tools needed by the verify scripts are downloaded on first use at the pinned
+Tools needed by the scripts (including kcp and kubectl) are downloaded on first use at the pinned
 versions in [hack/lib.sh](hack/lib.sh) into `_output/tools/`.
 
 ## Usage
@@ -36,7 +37,7 @@ versions in [hack/lib.sh](hack/lib.sh) into `_output/tools/`.
 ```sh
 make build
 
-_output/apiexport-proxy \
+_output/kcp-apiexport-proxy \
   --kubeconfig=/path/to/kubeconfig \
   --apiexportendpointslice-name=my-export \
   --bind-address=:8080
