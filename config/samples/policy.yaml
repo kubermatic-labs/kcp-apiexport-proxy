@@ -14,20 +14,20 @@
 
 # Denies any object whose "kcp.io/cluster" annotation points at a logical
 # cluster that isn't actually bound to the APIExport served behind
-# apiexport-proxy (see /workspace/src). It does this by extracting the
-# cluster name from the object under review and asking apiexport-proxy
+# kcp-apiexport-proxy (see /workspace/src). It does this by extracting the
+# cluster name from the object under review and asking kcp-apiexport-proxy
 # whether that cluster has any APIBindings, via the extended Kyverno CEL
 # "http" library - the same GET /clusters/<cluster>/... path the proxy
 # implements.
 #
 # Before applying:
-#   - point spec.variables[1].expression's URL at your actual apiexport-proxy
+#   - point spec.variables[1].expression's URL at your actual kcp-apiexport-proxy
 #     Service (name/namespace/port below are placeholders).
 #   - adjust the apiBindings group/version in the URL if you're validating
 #     against a different APIExport's virtual workspace than
 #     apis.kcp.io/v1alpha1.
 #
-# Note the failure mode this implies: if apiexport-proxy is unreachable,
+# Note the failure mode this implies: if kcp-apiexport-proxy is unreachable,
 # http.Get errors out and (with failurePolicy: Fail) admission is denied.
 # That's a deliberate fail-closed choice for a referential-integrity check
 # that must be answered synchronously at admission time, but it does couple
@@ -55,16 +55,16 @@ spec:
     # The target logical cluster, extracted from the object under review.
     - name: cluster
       expression: "object.metadata.?annotations[?'kcp.io/cluster'].orValue('')"
-    # Ask apiexport-proxy for this cluster's APIBindings. apiexport-proxy
+    # Ask kcp-apiexport-proxy for this cluster's APIBindings. kcp-apiexport-proxy
     # forwards this to the shard hosting `cluster`, or 404s if the cluster
     # isn't known to the watched APIExportEndpointSlice at all.
     - name: apiBindings
       expression: >-
-        http.Get('http://apiexport-proxy.kcp-system.svc.cluster.local:8080/clusters/'
+        http.Get('http://kcp-apiexport-proxy.kcp-system.svc.cluster.local:8080/clusters/'
           + variables.cluster + '/apis/apis.kcp.io/v1alpha1/apibindings')
   validations:
     - expression: "variables.apiBindings.items.size() > 0"
       message: >-
         Logical cluster referenced by the "kcp.io/cluster" annotation has no
-        APIBindings for this APIExport (checked via apiexport-proxy at
+        APIBindings for this APIExport (checked via kcp-apiexport-proxy at
         /clusters/<cluster>/apis/apis.kcp.io/v1alpha1/apibindings).

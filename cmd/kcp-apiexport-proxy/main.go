@@ -51,9 +51,9 @@ func NewProxyCommand() *cobra.Command {
 	options := proxyoptions.NewOptions()
 
 	cmd := &cobra.Command{
-		Use:   "apiexport-proxy",
+		Use:   "kcp-apiexport-proxy",
 		Short: "Unauthenticated reverse proxy for a kcp APIExport's virtual workspace endpoints",
-		Long: `apiexport-proxy watches a named APIExportEndpointSlice for its shard virtual
+		Long: `kcp-apiexport-proxy watches a named APIExportEndpointSlice for its shard virtual
 workspace URLs, watches APIBindings through each of them to learn which
 logical cluster lives behind which shard, and forwards
 /clusters/<logical_cluster>/... requests to the right shard using the

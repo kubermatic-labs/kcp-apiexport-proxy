@@ -28,6 +28,10 @@ build:
 test:
 	go test ./...
 
+.PHONY: test-integration
+test-integration:
+	./hack/test-integration.sh
+
 .PHONY: verify
 verify:
 	./hack/verify-boilerplate.sh

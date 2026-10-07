@@ -104,7 +104,7 @@ func (s *Server) PrepareRun(context.Context) (preparedServer, error) {
 }
 
 func (s preparedServer) Run(ctx context.Context) error {
-	logger := klog.FromContext(ctx).WithValues("component", "apiexport-proxy")
+	logger := klog.FromContext(ctx).WithValues("component", "kcp-apiexport-proxy")
 
 	go s.IndexController.Start(ctx)
 
