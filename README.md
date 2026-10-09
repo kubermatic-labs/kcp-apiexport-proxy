@@ -24,7 +24,8 @@ the proxied paths, and with `--tls-cert-file` and `--tls-key-file` the proxy
 serves HTTPS. A token without TLS works but is sent in plain text, so the
 proxy logs a warning. All three files are reloaded when they
 change, for example when they are mounted from Secrets. The proxy never
-forwards a client's `Authorization` or `Impersonate-*` headers to kcp.
+forwards a client's `Authorization` or `Impersonate-*` headers to kcp, and
+by default only accepts `GET` requests (`--allowed-http-methods`).
 
 ## Development
 
@@ -57,6 +58,7 @@ _output/kcp-apiexport-proxy \
 | `--kubeconfig` | Kubeconfig whose current context points at the workspace containing the `APIExportEndpointSlice`; also used as the identity for all requests to shards. Required. |
 | `--apiexportendpointslice-names` | Comma-separated names of the `APIExportEndpointSlices` to watch, all in the kubeconfig's workspace. Required. |
 | `--bind-address` | Listen address (default `:8080`). |
+| `--allowed-http-methods` | Comma-separated HTTP methods accepted for proxied requests (default `GET`); others get a `405`. Must be among `GET`, `POST`, `PUT`, `PATCH` and `DELETE` (the methods the Kubernetes API uses), spelled exactly in uppercase, otherwise the proxy refuses to start. |
 | `--token-file` | File containing the bearer token clients must send for the proxied paths; reloaded when it changes. Should be combined with TLS, otherwise the token is sent in plain text. Optional, no authentication if not set. |
 | `--tls-cert-file` | PEM encoded serving certificate; reloaded when it changes. Optional, plain HTTP if not set. |
 | `--tls-key-file` | PEM encoded private key for `--tls-cert-file`; reloaded when it changes. Required with `--tls-cert-file`. |

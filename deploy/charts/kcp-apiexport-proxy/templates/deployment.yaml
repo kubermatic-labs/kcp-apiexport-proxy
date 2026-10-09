@@ -53,6 +53,7 @@ spec:
             - --kubeconfig=/etc/kcp-apiexport-proxy/kubeconfig/{{ .Values.kubeconfig.key }}
             - --apiexportendpointslice-names={{ join "," .Values.apiExportEndpointSliceNames }}
             - --bind-address=:8080
+            - --allowed-http-methods={{ join "," .Values.allowedHTTPMethods }}
             {{- if .Values.tls.enabled }}
             - --tls-cert-file=/etc/kcp-apiexport-proxy/tls/tls.crt
             - --tls-key-file=/etc/kcp-apiexport-proxy/tls/tls.key
