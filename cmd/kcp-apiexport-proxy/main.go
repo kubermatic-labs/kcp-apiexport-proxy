@@ -54,13 +54,14 @@ func NewProxyCommand() *cobra.Command {
 	cmd := &cobra.Command{
 		Use:     "kcp-apiexport-proxy",
 		Version: version.Version,
-		Short:   "Unauthenticated reverse proxy for kcp APIExports' virtual workspace endpoints",
+		Short:   "Reverse proxy for kcp APIExports' virtual workspace endpoints",
 		Long: `kcp-apiexport-proxy watches the named APIExportEndpointSlices for their shard
 virtual workspace URLs, watches APIBindings through each of them to learn
 which logical cluster lives behind which shard, and forwards
 /apiexportendpointslices/<slice>/clusters/<logical_cluster>/... requests to
-the right shard using the identity of a single configured kubeconfig. It
-performs no authentication.`,
+the right shard using the identity of a single configured kubeconfig.
+Clients can be required to send a bearer token (--token-file), and the
+proxy can serve HTTPS (--tls-cert-file, --tls-key-file).`,
 		SilenceUsage: true,
 		RunE: func(cmd *cobra.Command, _ []string) error {
 			if err := options.Complete(); err != nil {

@@ -43,6 +43,9 @@ func TestAddFlags(t *testing.T) {
 		"--kubeconfig=/tmp/kubeconfig",
 		"--apiexportendpointslice-names=slice-a,slice-b",
 		"--bind-address=127.0.0.1:9090",
+		"--token-file=/tmp/token",
+		"--tls-cert-file=/tmp/tls.crt",
+		"--tls-key-file=/tmp/tls.key",
 	})
 	if err != nil {
 		t.Fatalf("failed to parse flags: %v", err)
@@ -52,6 +55,9 @@ func TestAddFlags(t *testing.T) {
 		Kubeconfig:                  "/tmp/kubeconfig",
 		APIExportEndpointSliceNames: []string{"slice-a", "slice-b"},
 		BindAddress:                 "127.0.0.1:9090",
+		TokenFile:                   "/tmp/token",
+		TLSCertFile:                 "/tmp/tls.crt",
+		TLSKeyFile:                  "/tmp/tls.key",
 	}
 	if !reflect.DeepEqual(*o, want) {
 		t.Fatalf("got %+v, want %+v", *o, want)
@@ -69,6 +75,9 @@ func TestValidate(t *testing.T) {
 		name       string
 		kubeconfig string
 		sliceNames []string
+		tokenFile  string
+		certFile   string
+		keyFile    string
 		wantErrs   int
 	}{
 		{name: "valid", kubeconfig: "/tmp/kubeconfig", sliceNames: []string{"my-slice"}, wantErrs: 0},
@@ -78,6 +87,11 @@ func TestValidate(t *testing.T) {
 		{name: "missing both", wantErrs: 2},
 		{name: "empty slice name", kubeconfig: "/tmp/kubeconfig", sliceNames: []string{"slice-a", ""}, wantErrs: 1},
 		{name: "duplicate slice name", kubeconfig: "/tmp/kubeconfig", sliceNames: []string{"slice-a", "slice-a"}, wantErrs: 1},
+		{name: "TLS", kubeconfig: "/tmp/kubeconfig", sliceNames: []string{"my-slice"}, certFile: "/tmp/tls.crt", keyFile: "/tmp/tls.key", wantErrs: 0},
+		{name: "TLS and token", kubeconfig: "/tmp/kubeconfig", sliceNames: []string{"my-slice"}, tokenFile: "/tmp/token", certFile: "/tmp/tls.crt", keyFile: "/tmp/tls.key", wantErrs: 0},
+		{name: "TLS certificate without key", kubeconfig: "/tmp/kubeconfig", sliceNames: []string{"my-slice"}, certFile: "/tmp/tls.crt", wantErrs: 1},
+		{name: "TLS key without certificate", kubeconfig: "/tmp/kubeconfig", sliceNames: []string{"my-slice"}, keyFile: "/tmp/tls.key", wantErrs: 1},
+		{name: "token without TLS", kubeconfig: "/tmp/kubeconfig", sliceNames: []string{"my-slice"}, tokenFile: "/tmp/token", wantErrs: 1},
 	}
 
 	for _, tc := range tests {
@@ -85,6 +99,9 @@ func TestValidate(t *testing.T) {
 			o := NewOptions()
 			o.Kubeconfig = tc.kubeconfig
 			o.APIExportEndpointSliceNames = tc.sliceNames
+			o.TokenFile = tc.tokenFile
+			o.TLSCertFile = tc.certFile
+			o.TLSKeyFile = tc.keyFile
 
 			if errs := o.Validate(); len(errs) != tc.wantErrs {
 				t.Fatalf("got %d errors (%v), want %d", len(errs), errs, tc.wantErrs)

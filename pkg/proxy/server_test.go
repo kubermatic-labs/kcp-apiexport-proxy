@@ -18,10 +18,14 @@ package proxy
 
 import (
 	"context"
+	"crypto/tls"
+	"crypto/x509"
 	"io"
 	"net"
 	"net/http"
 	"net/http/httptest"
+	"os"
+	"path/filepath"
 	"testing"
 	"time"
 
@@ -29,6 +33,7 @@ import (
 	"k8s.io/client-go/rest"
 
 	"github.com/kubermatic-labs/kcp-apiexport-proxy/pkg/proxy/internal/fakekcp"
+	"github.com/kubermatic-labs/kcp-apiexport-proxy/pkg/proxy/internal/testcerts"
 	proxyoptions "github.com/kubermatic-labs/kcp-apiexport-proxy/pkg/proxy/options"
 )
 
@@ -54,12 +59,15 @@ func newTestFakeKCP(t *testing.T) *fakekcp.Server {
 	return fake
 }
 
-func newTestServer(t *testing.T, fake *fakekcp.Server, bindAddress string) *Server {
+func newTestServer(t *testing.T, fake *fakekcp.Server, bindAddress string, configure ...func(*proxyoptions.Options)) *Server {
 	t.Helper()
 
 	opts := proxyoptions.NewOptions()
 	opts.APIExportEndpointSliceNames = []string{"slice-a", "slice-b"}
 	opts.BindAddress = bindAddress
+	for _, f := range configure {
+		f(opts)
+	}
 
 	c := &Config{Options: opts, ExtraConfig: ExtraConfig{IdentityConfig: &rest.Config{Host: fake.URL}}}
 	completed, err := c.Complete()
@@ -285,5 +293,158 @@ func TestRunCacheSyncFailure(t *testing.T) {
 	cancel()
 	if err := prepared.Run(ctx); err == nil {
 		t.Fatalf("expected Run to fail when the context is cancelled before the cache syncs")
+	}
+}
+
+// writeSecrets writes a serving certificate, its key and a token into a
+// temporary directory and returns a function that configures the options to
+// use them, plus the certificate.
+func writeSecrets(t *testing.T, token string) (func(*proxyoptions.Options), []byte) {
+	t.Helper()
+
+	dir := t.TempDir()
+	certPEM, keyPEM := testcerts.Generate(t)
+
+	files := map[string][]byte{"tls.crt": certPEM, "tls.key": keyPEM, "token": []byte(token)}
+	for name, data := range files {
+		if err := os.WriteFile(filepath.Join(dir, name), data, 0o600); err != nil {
+			t.Fatalf("failed to write %s: %v", name, err)
+		}
+	}
+
+	return func(o *proxyoptions.Options) {
+		o.TLSCertFile = filepath.Join(dir, "tls.crt")
+		o.TLSKeyFile = filepath.Join(dir, "tls.key")
+		o.TokenFile = filepath.Join(dir, "token")
+	}, certPEM
+}
+
+func TestRunWithTLSAndToken(t *testing.T) {
+	fake := newTestFakeKCP(t)
+	fake.SetFallback(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
+		_, _ = io.WriteString(w, "authorization="+r.Header.Get("Authorization"))
+	}))
+
+	configure, certPEM := writeSecrets(t, "secret\n")
+	addr := freeAddress(t)
+	s := newTestServer(t, fake, addr, configure)
+
+	prepared, err := s.PrepareRun(t.Context())
+	if err != nil {
+		t.Fatalf("PrepareRun: %v", err)
+	}
+
+	ctx, cancel := context.WithCancel(t.Context())
+	defer cancel()
+	go func() {
+		_ = prepared.Run(ctx)
+	}()
+
+	roots := x509.NewCertPool()
+	roots.AppendCertsFromPEM(certPEM)
+	client := &http.Client{Transport: &http.Transport{TLSClientConfig: &tls.Config{RootCAs: roots, MinVersion: tls.VersionTLS12}}}
+
+	do := func(ctx context.Context, path, token string) (int, string, error) {
+		req, err := http.NewRequestWithContext(ctx, http.MethodGet, "https://"+addr+path, nil)
+		if err != nil {
+			return 0, "", err
+		}
+		if token != "" {
+			req.Header.Set("Authorization", "Bearer "+token)
+		}
+		resp, err := client.Do(req)
+		if err != nil {
+			return 0, "", err
+		}
+		defer func() { _ = resp.Body.Close() }()
+		body, err := io.ReadAll(resp.Body)
+		return resp.StatusCode, string(body), err
+	}
+
+	pollCtx, pollCancel := context.WithTimeout(ctx, 10*time.Second)
+	defer pollCancel()
+	err = wait.PollUntilContextCancel(pollCtx, 10*time.Millisecond, true, func(ctx context.Context) (bool, error) {
+		code, _, err := do(ctx, "/readyz", "")
+		return err == nil && code == http.StatusOK, nil
+	})
+	if err != nil {
+		t.Fatalf("server did not become ready over TLS without a token: %v", err)
+	}
+
+	const path = "/apiexportendpointslices/slice-a/clusters/1abc/api/v1/configmaps"
+
+	err = wait.PollUntilContextCancel(pollCtx, 10*time.Millisecond, true, func(ctx context.Context) (bool, error) {
+		code, _, err := do(ctx, path, "secret")
+		return err == nil && code == http.StatusOK, nil
+	})
+	if err != nil {
+		t.Fatalf("proxied request with the token did not succeed: %v", err)
+	}
+
+	code, body, err := do(t.Context(), path, "secret")
+	if err != nil {
+		t.Fatalf("request with token: %v", err)
+	}
+	if code != http.StatusOK || body != "authorization=" {
+		t.Fatalf("request with token: got status %d and body %q, want %d and the token not forwarded", code, body, http.StatusOK)
+	}
+
+	for _, token := range []string{"", "wrong"} {
+		code, _, err := do(t.Context(), path, token)
+		if err != nil {
+			t.Fatalf("request with token %q: %v", token, err)
+		}
+		if code != http.StatusUnauthorized {
+			t.Fatalf("request with token %q: got status %d, want %d", token, code, http.StatusUnauthorized)
+		}
+	}
+
+	code, _, err = do(t.Context(), "/apiexportendpointslices/slice-a/clusters/unknown/api/v1/configmaps", "")
+	if err != nil {
+		t.Fatalf("request for unknown cluster without token: %v", err)
+	}
+	if code != http.StatusUnauthorized {
+		t.Fatalf("request for unknown cluster without token: got status %d, want %d", code, http.StatusUnauthorized)
+	}
+}
+
+func TestNewServerInvalidSecrets(t *testing.T) {
+	fake := newTestFakeKCP(t)
+
+	tests := []struct {
+		name      string
+		configure func(*proxyoptions.Options)
+	}{
+		{
+			name: "missing token file",
+			configure: func(o *proxyoptions.Options) {
+				o.TokenFile = filepath.Join(t.TempDir(), "missing")
+			},
+		},
+		{
+			name: "missing certificate",
+			configure: func(o *proxyoptions.Options) {
+				o.TLSCertFile = filepath.Join(t.TempDir(), "tls.crt")
+				o.TLSKeyFile = filepath.Join(t.TempDir(), "tls.key")
+			},
+		},
+	}
+
+	for _, tc := range tests {
+		t.Run(tc.name, func(t *testing.T) {
+			opts := proxyoptions.NewOptions()
+			opts.APIExportEndpointSliceNames = []string{"slice-a"}
+			tc.configure(opts)
+
+			c := &Config{Options: opts, ExtraConfig: ExtraConfig{IdentityConfig: &rest.Config{Host: fake.URL}}}
+			completed, err := c.Complete()
+			if err != nil {
+				t.Fatalf("Complete: %v", err)
+			}
+
+			if _, err := NewServer(completed); err == nil {
+				t.Fatalf("expected an error")
+			}
+		})
 	}
 }

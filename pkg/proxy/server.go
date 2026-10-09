@@ -18,6 +18,7 @@ package proxy
 
 import (
 	"context"
+	"crypto/tls"
 	"errors"
 	"fmt"
 	"net/http"
@@ -27,6 +28,8 @@ import (
 	"k8s.io/client-go/tools/cache"
 	"k8s.io/klog/v2"
 
+	"github.com/kubermatic-labs/kcp-apiexport-proxy/pkg/proxy/auth"
+	"github.com/kubermatic-labs/kcp-apiexport-proxy/pkg/proxy/filereload"
 	"github.com/kubermatic-labs/kcp-apiexport-proxy/pkg/proxy/index"
 	"github.com/kubermatic-labs/kcp-apiexport-proxy/pkg/proxy/lookup"
 	"github.com/kubermatic-labs/kcp-apiexport-proxy/pkg/proxy/metrics"
@@ -35,6 +38,9 @@ import (
 type Server struct {
 	CompletedConfig
 	Handler http.Handler
+	// KeyPair is the serving certificate, or nil if the proxy serves plain
+	// HTTP.
+	KeyPair *filereload.KeyPair
 	// IndexControllers holds one index controller per watched
 	// APIExportEndpointSlice, keyed by the slice's name.
 	IndexControllers map[string]*index.Controller
@@ -63,6 +69,21 @@ func NewServer(c CompletedConfig) (*Server, error) {
 
 	var handler http.Handler = newShardReverseProxy(transport)
 	handler = lookup.WithClusterResolver(handler, indexes)
+
+	if c.Options.TokenFile != "" {
+		tokenFile := filereload.New(c.Options.TokenFile)
+		if _, _, err := tokenFile.Load(); err != nil {
+			return nil, fmt.Errorf("failed to load token: %w", err)
+		}
+		handler = auth.WithToken(handler, tokenFile)
+	}
+
+	if c.Options.TLSCertFile != "" {
+		s.KeyPair = filereload.NewKeyPair(c.Options.TLSCertFile, c.Options.TLSKeyFile)
+		if _, err := s.KeyPair.GetCertificate(nil); err != nil {
+			return nil, fmt.Errorf("failed to load serving certificate: %w", err)
+		}
+	}
 	handler = metrics.WithLatencyTracking(handler)
 	handler = withPanicRecovery(handler)
 
@@ -137,10 +158,21 @@ func (s preparedServer) Run(ctx context.Context) error {
 		Handler: s.Handler,
 	}
 
+	listenAndServe := httpServer.ListenAndServe
+	if s.KeyPair != nil {
+		httpServer.TLSConfig = &tls.Config{
+			MinVersion:     tls.VersionTLS12,
+			GetCertificate: s.KeyPair.GetCertificate,
+		}
+		listenAndServe = func() error {
+			return httpServer.ListenAndServeTLS("", "")
+		}
+	}
+
 	errCh := make(chan error, 1)
 	go func() {
-		logger.Info("Serving", "address", s.Options.BindAddress)
-		if err := httpServer.ListenAndServe(); err != nil && !errors.Is(err, http.ErrServerClosed) {
+		logger.Info("Serving", "address", s.Options.BindAddress, "tls", s.KeyPair != nil, "authentication", s.Options.TokenFile != "")
+		if err := listenAndServe(); err != nil && !errors.Is(err, http.ErrServerClosed) {
 			errCh <- err
 			return
 		}

@@ -18,8 +18,12 @@ stable URL through which they can reach any logical cluster bound to those
    right shard, using the identity from the configured kubeconfig. Requests
    for unknown slices or logical clusters get a `404`.
 
-The proxy serves plain HTTP and performs **no authentication**; it is meant
-to be reachable only from trusted in-cluster clients.
+By default the proxy serves plain HTTP and performs **no authentication**.
+With `--token-file`, clients must send `Authorization: Bearer <token>` to use
+the proxied paths, and with `--tls-cert-file` and `--tls-key-file` the proxy
+serves HTTPS; a token requires TLS. All three files are reloaded when they
+change, for example when they are mounted from Secrets. The proxy never
+forwards a client's `Authorization` or `Impersonate-*` headers to kcp.
 
 ## Development
 
@@ -41,7 +45,10 @@ make build
 _output/kcp-apiexport-proxy \
   --kubeconfig=/path/to/kubeconfig \
   --apiexportendpointslice-names=my-export,my-other-export \
-  --bind-address=:8080
+  --bind-address=:8443 \
+  --tls-cert-file=/path/to/tls.crt \
+  --tls-key-file=/path/to/tls.key \
+  --token-file=/path/to/token
 ```
 
 | Flag | Description |
@@ -49,14 +56,20 @@ _output/kcp-apiexport-proxy \
 | `--kubeconfig` | Kubeconfig whose current context points at the workspace containing the `APIExportEndpointSlice`; also used as the identity for all requests to shards. Required. |
 | `--apiexportendpointslice-names` | Comma-separated names of the `APIExportEndpointSlices` to watch, all in the kubeconfig's workspace. Required. |
 | `--bind-address` | Listen address (default `:8080`). |
+| `--token-file` | File containing the bearer token clients must send for the proxied paths; reloaded when it changes. Requires `--tls-cert-file` and `--tls-key-file`. Optional, no authentication if not set. |
+| `--tls-cert-file` | PEM encoded serving certificate; reloaded when it changes. Optional, plain HTTP if not set. |
+| `--tls-key-file` | PEM encoded private key for `--tls-cert-file`; reloaded when it changes. Required with `--tls-cert-file`. |
+| `--version` | Prints the version and exits. |
 
 Besides the proxied `/apiexportendpointslices/...` paths, the server exposes `/healthz`,
-`/readyz` and `/metrics`.
+`/readyz` and `/metrics`, which never require the token.
 
 Example request:
 
 ```sh
-curl http://localhost:8080/apiexportendpointslices/my-export/clusters/<logical-cluster>/apis/apis.kcp.io/v1alpha1/apibindings
+curl --cacert /path/to/ca.crt \
+  --header "Authorization: Bearer $(cat /path/to/token)" \
+  https://localhost:8443/apiexportendpointslices/my-export/clusters/<logical-cluster>/apis/apis.kcp.io/v1alpha1/apibindings
 ```
 
 A sample Kyverno `ValidatingPolicy` that uses the proxy can be found in

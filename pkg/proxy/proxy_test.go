@@ -97,6 +97,38 @@ func TestShardReverseProxyForwardsToShardURL(t *testing.T) {
 	}
 }
 
+func TestShardReverseProxyStripsClientCredentials(t *testing.T) {
+	var gotHeader http.Header
+	transport := roundTripperFunc(func(req *http.Request) (*http.Response, error) {
+		gotHeader = req.Header
+		return &http.Response{StatusCode: http.StatusOK, Body: http.NoBody, Request: req}, nil
+	})
+
+	proxy := newShardReverseProxy(transport)
+
+	req := httptest.NewRequestWithContext(t.Context(), http.MethodGet, "/clusters/1abc", nil)
+	req.Header.Set("Authorization", "Bearer client-token")
+	req.Header.Set("Impersonate-User", "admin")
+	req.Header.Set("Impersonate-Group", "system:masters")
+	req.Header.Set("Accept", "application/json")
+	req = req.WithContext(lookup.WithShardURL(req.Context(), &url.URL{Scheme: "https", Host: "shard-a.example.com", Path: "/clusters/1abc"}))
+
+	rec := httptest.NewRecorder()
+	proxy.ServeHTTP(rec, req)
+
+	if rec.Code != http.StatusOK {
+		t.Fatalf("got status %d, want %d", rec.Code, http.StatusOK)
+	}
+	for _, header := range []string{"Authorization", "Impersonate-User", "Impersonate-Group"} {
+		if got := gotHeader.Get(header); got != "" {
+			t.Fatalf("expected %s to be removed, got %q", header, got)
+		}
+	}
+	if got := gotHeader.Get("Accept"); got != "application/json" {
+		t.Fatalf("expected other headers to be kept, got Accept %q", got)
+	}
+}
+
 func TestShardReverseProxyWithoutShardURL(t *testing.T) {
 	var gotHost string
 	transport := roundTripperFunc(func(req *http.Request) (*http.Response, error) {
