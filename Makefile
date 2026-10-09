@@ -15,14 +15,9 @@
 export CGO_ENABLED ?= 0
 export GOFLAGS ?= -mod=readonly -trimpath
 
-BUILD_DEST ?= _output
-CMD ?= $(notdir $(wildcard ./cmd/*))
-GOBUILDFLAGS ?= -v
-LDFLAGS ?= -w -extldflags '-static'
-
 .PHONY: build
 build:
-	$(foreach cmd,$(CMD),go build $(GOBUILDFLAGS) -ldflags "$(LDFLAGS)" -o $(BUILD_DEST)/$(cmd) ./cmd/$(cmd) &&) true
+	./build/build.sh
 
 .PHONY: test
 test:
