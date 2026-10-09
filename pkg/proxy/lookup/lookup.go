@@ -26,7 +26,7 @@ import (
 
 	"github.com/kcp-dev/logicalcluster/v3"
 
-	"github.com/kcp-dev/contrib-apiexport-proxy/pkg/proxy/index"
+	"github.com/kubermatic-labs/kcp-apiexport-proxy/pkg/proxy/index"
 )
 
 // WithClusterResolver resolves the {slice} and {cluster} in

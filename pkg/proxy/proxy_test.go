@@ -26,7 +26,7 @@ import (
 
 	"k8s.io/client-go/rest"
 
-	"github.com/kcp-dev/contrib-apiexport-proxy/pkg/proxy/lookup"
+	"github.com/kubermatic-labs/kcp-apiexport-proxy/pkg/proxy/lookup"
 )
 
 type roundTripperFunc func(*http.Request) (*http.Response, error)

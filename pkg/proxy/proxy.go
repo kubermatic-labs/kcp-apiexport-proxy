@@ -24,8 +24,8 @@ import (
 	utilruntime "k8s.io/apimachinery/pkg/util/runtime"
 	"k8s.io/client-go/rest"
 
-	"github.com/kcp-dev/contrib-apiexport-proxy/pkg/proxy/lookup"
-	"github.com/kcp-dev/contrib-apiexport-proxy/pkg/proxy/metrics"
+	"github.com/kubermatic-labs/kcp-apiexport-proxy/pkg/proxy/lookup"
+	"github.com/kubermatic-labs/kcp-apiexport-proxy/pkg/proxy/metrics"
 )
 
 // newTransport builds the single http.RoundTripper used for every outbound

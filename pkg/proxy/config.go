@@ -22,7 +22,7 @@ import (
 	"k8s.io/client-go/rest"
 	"k8s.io/client-go/tools/clientcmd"
 
-	proxyoptions "github.com/kcp-dev/contrib-apiexport-proxy/pkg/proxy/options"
+	proxyoptions "github.com/kubermatic-labs/kcp-apiexport-proxy/pkg/proxy/options"
 )
 
 type Config struct {

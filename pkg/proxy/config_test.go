@@ -23,7 +23,7 @@ import (
 
 	"k8s.io/client-go/rest"
 
-	proxyoptions "github.com/kcp-dev/contrib-apiexport-proxy/pkg/proxy/options"
+	proxyoptions "github.com/kubermatic-labs/kcp-apiexport-proxy/pkg/proxy/options"
 )
 
 const testKubeconfig = `apiVersion: v1

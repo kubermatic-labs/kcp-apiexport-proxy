@@ -29,9 +29,9 @@ import (
 	utilerrors "k8s.io/apimachinery/pkg/util/errors"
 	"k8s.io/klog/v2"
 
-	"github.com/kcp-dev/contrib-apiexport-proxy/pkg/proxy"
-	proxyoptions "github.com/kcp-dev/contrib-apiexport-proxy/pkg/proxy/options"
-	"github.com/kcp-dev/contrib-apiexport-proxy/pkg/version"
+	"github.com/kubermatic-labs/kcp-apiexport-proxy/pkg/proxy"
+	proxyoptions "github.com/kubermatic-labs/kcp-apiexport-proxy/pkg/proxy/options"
+	"github.com/kubermatic-labs/kcp-apiexport-proxy/pkg/version"
 )
 
 func main() {

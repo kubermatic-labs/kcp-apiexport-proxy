@@ -1,4 +1,4 @@
-module github.com/kcp-dev/contrib-apiexport-proxy
+module github.com/kubermatic-labs/kcp-apiexport-proxy
 
 go 1.26.0
 

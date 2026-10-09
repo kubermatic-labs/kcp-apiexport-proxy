@@ -41,7 +41,7 @@ GOARCH="$(go env GOARCH)"
 for cmd in "$@"; do
   # shellcheck disable=SC2086
   go build $GOBUILDFLAGS \
-    -ldflags "$LDFLAGS -X github.com/kcp-dev/contrib-apiexport-proxy/pkg/version.Version=$VERSION" \
+    -ldflags "$LDFLAGS -X github.com/kubermatic-labs/kcp-apiexport-proxy/pkg/version.Version=$VERSION" \
     -o "$BUILD_DEST/$cmd" "./cmd/$cmd"
 
   archive="${cmd}_${VERSION}_${GOOS}_${GOARCH}.tar.gz"

@@ -27,9 +27,9 @@ import (
 	"k8s.io/client-go/tools/cache"
 	"k8s.io/klog/v2"
 
-	"github.com/kcp-dev/contrib-apiexport-proxy/pkg/proxy/index"
-	"github.com/kcp-dev/contrib-apiexport-proxy/pkg/proxy/lookup"
-	"github.com/kcp-dev/contrib-apiexport-proxy/pkg/proxy/metrics"
+	"github.com/kubermatic-labs/kcp-apiexport-proxy/pkg/proxy/index"
+	"github.com/kubermatic-labs/kcp-apiexport-proxy/pkg/proxy/lookup"
+	"github.com/kubermatic-labs/kcp-apiexport-proxy/pkg/proxy/metrics"
 )
 
 type Server struct {
