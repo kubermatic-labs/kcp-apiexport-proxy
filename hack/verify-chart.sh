@@ -27,10 +27,11 @@ REQUIRED=(--set 'apiExportEndpointSliceNames={example}' --set kubeconfig.secretN
 echodate "Linting the Helm chart..."
 "$TOOLS_DIR/helm" lint --strict "$CHART" "${REQUIRED[@]}"
 
-echodate "Rendering the Helm chart with and without a token and TLS..."
+echodate "Rendering the Helm chart with and without a token, TLS and a NetworkPolicy..."
 for token in true false; do
   for tls in true false; do
-    "$TOOLS_DIR/helm" template "$CHART" "${REQUIRED[@]}" --set token.enabled=$token --set tls.enabled=$tls > /dev/null
+    "$TOOLS_DIR/helm" template "$CHART" "${REQUIRED[@]}" --set token.enabled=$token --set tls.enabled=$tls \
+      --set 'networkPolicy.allowedNamespaces={kyverno}' > /dev/null
   done
 done
 

@@ -19,7 +19,10 @@ the versions pinned in [hack/lib.sh](../hack/lib.sh).
 4. Installs the proxy with its Helm chart
    ([deploy/charts/kcp-apiexport-proxy](../deploy/charts/kcp-apiexport-proxy),
    values in [manifests/cluster/proxy-values.yaml](manifests/cluster/proxy-values.yaml)),
-   using the chart's defaults: a generated token and plain HTTP.
+   using the chart's defaults (a generated token and plain HTTP) plus a
+   NetworkPolicy that only admits pods from the `kyverno` namespace. The
+   test doesn't check that the NetworkPolicy is enforced, that is up to the
+   cluster's network plugin.
 5. Through a port-forward to the proxy, checks that:
    - requests with the token return the consumer's `Widget`s and APIBindings,
    - requests for an unknown logical cluster get a `404`,

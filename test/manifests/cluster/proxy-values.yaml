@@ -24,3 +24,7 @@ apiExportEndpointSliceNames:
 
 kubeconfig:
   secretName: kcp-apiexport-proxy-kubeconfig
+
+networkPolicy:
+  allowedNamespaces:
+    - kyverno
