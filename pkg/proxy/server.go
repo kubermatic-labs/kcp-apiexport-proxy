@@ -158,6 +158,11 @@ func (s preparedServer) Run(ctx context.Context) error {
 		Handler: s.Handler,
 	}
 
+	if s.Options.TokenFile != "" && s.KeyPair == nil {
+		logger.Info("WARNING: --token-file is set without TLS, so the token and all responses are sent in plain text; " +
+			"set --tls-cert-file and --tls-key-file to protect them")
+	}
+
 	listenAndServe := httpServer.ListenAndServe
 	if s.KeyPair != nil {
 		httpServer.TLSConfig = &tls.Config{

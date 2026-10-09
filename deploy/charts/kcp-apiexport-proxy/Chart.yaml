@@ -12,26 +12,9 @@
 # See the License for the specific language governing permissions and
 # limitations under the License.
 
-export CGO_ENABLED ?= 0
-export GOFLAGS ?= -mod=readonly -trimpath
-
-.PHONY: build
-build:
-	./build/build.sh
-
-.PHONY: test
-test:
-	go test ./...
-
-.PHONY: test-integration
-test-integration:
-	./test/test-integration.sh
-
-.PHONY: verify
-verify:
-	./hack/verify-boilerplate.sh
-	./hack/verify-chart.sh
-	./hack/verify-dependencies.sh
-	./hack/verify-unicode.sh
-	./hack/verify-import-order.sh
-	./hack/verify-lint.sh
+apiVersion: v2
+name: kcp-apiexport-proxy
+description: Reverse proxy for the virtual workspace endpoints of kcp APIExports.
+type: application
+version: 0.0.0-dev
+appVersion: 0.0.0-dev

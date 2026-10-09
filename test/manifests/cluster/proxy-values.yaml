@@ -12,26 +12,15 @@
 # See the License for the specific language governing permissions and
 # limitations under the License.
 
-export CGO_ENABLED ?= 0
-export GOFLAGS ?= -mod=readonly -trimpath
+# Values for the kcp-apiexport-proxy chart, using the image the test builds
+# and the kubeconfig Secret the test script creates.
+image:
+  repository: kcp-apiexport-proxy
+  tag: test
+  pullPolicy: Never
 
-.PHONY: build
-build:
-	./build/build.sh
+apiExportEndpointSliceNames:
+  - example.com
 
-.PHONY: test
-test:
-	go test ./...
-
-.PHONY: test-integration
-test-integration:
-	./test/test-integration.sh
-
-.PHONY: verify
-verify:
-	./hack/verify-boilerplate.sh
-	./hack/verify-chart.sh
-	./hack/verify-dependencies.sh
-	./hack/verify-unicode.sh
-	./hack/verify-import-order.sh
-	./hack/verify-lint.sh
+kubeconfig:
+  secretName: kcp-apiexport-proxy-kubeconfig

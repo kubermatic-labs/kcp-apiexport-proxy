@@ -91,7 +91,7 @@ func TestValidate(t *testing.T) {
 		{name: "TLS and token", kubeconfig: "/tmp/kubeconfig", sliceNames: []string{"my-slice"}, tokenFile: "/tmp/token", certFile: "/tmp/tls.crt", keyFile: "/tmp/tls.key", wantErrs: 0},
 		{name: "TLS certificate without key", kubeconfig: "/tmp/kubeconfig", sliceNames: []string{"my-slice"}, certFile: "/tmp/tls.crt", wantErrs: 1},
 		{name: "TLS key without certificate", kubeconfig: "/tmp/kubeconfig", sliceNames: []string{"my-slice"}, keyFile: "/tmp/tls.key", wantErrs: 1},
-		{name: "token without TLS", kubeconfig: "/tmp/kubeconfig", sliceNames: []string{"my-slice"}, tokenFile: "/tmp/token", wantErrs: 1},
+		{name: "token without TLS", kubeconfig: "/tmp/kubeconfig", sliceNames: []string{"my-slice"}, tokenFile: "/tmp/token", wantErrs: 0},
 	}
 
 	for _, tc := range tests {

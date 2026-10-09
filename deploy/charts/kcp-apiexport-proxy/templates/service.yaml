@@ -12,26 +12,18 @@
 # See the License for the specific language governing permissions and
 # limitations under the License.
 
-export CGO_ENABLED ?= 0
-export GOFLAGS ?= -mod=readonly -trimpath
-
-.PHONY: build
-build:
-	./build/build.sh
-
-.PHONY: test
-test:
-	go test ./...
-
-.PHONY: test-integration
-test-integration:
-	./test/test-integration.sh
-
-.PHONY: verify
-verify:
-	./hack/verify-boilerplate.sh
-	./hack/verify-chart.sh
-	./hack/verify-dependencies.sh
-	./hack/verify-unicode.sh
-	./hack/verify-import-order.sh
-	./hack/verify-lint.sh
+apiVersion: v1
+kind: Service
+metadata:
+  name: {{ include "kcp-apiexport-proxy.fullname" . }}
+  namespace: {{ .Release.Namespace }}
+  labels:
+    {{- include "kcp-apiexport-proxy.labels" . | nindent 4 }}
+spec:
+  type: {{ .Values.service.type }}
+  selector:
+    {{- include "kcp-apiexport-proxy.selectorLabels" . | nindent 4 }}
+  ports:
+    - name: {{ include "kcp-apiexport-proxy.scheme" . }}
+      port: {{ .Values.service.port }}
+      targetPort: {{ include "kcp-apiexport-proxy.scheme" . }}

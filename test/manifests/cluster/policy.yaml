@@ -12,8 +12,10 @@
 # See the License for the specific language governing permissions and
 # limitations under the License.
 
-# Like config/samples/policy.yaml, but limited to ConfigMaps and pointing at
-# the proxy deployed by proxy.yaml.
+# Like config/samples/policy.yaml, but limited to ConfigMaps. The token is
+# read from the chart's Secret (see kyverno-rbac.yaml). The proxy is called
+# over plain HTTP because Kyverno's http.Client(caBundle) is broken, see
+# test/README.md.
 apiVersion: policies.kyverno.io/v1
 kind: ValidatingPolicy
 metadata:
@@ -34,10 +36,16 @@ spec:
   variables:
     - name: cluster
       expression: "object.metadata.?annotations[?'kcp.io/cluster'].orValue('')"
+    - name: token
+      expression: >-
+        string(base64.decode(resource.Get('v1', 'secrets', 'kcp-apiexport-proxy',
+          'kcp-apiexport-proxy-token').data.token))
     - name: apiBindings
       expression: >-
-        http.Get('http://kcp-apiexport-proxy.kcp-apiexport-proxy.svc.cluster.local:8080/apiexportendpointslices/example.com/clusters/'
-          + variables.cluster + '/apis/apis.kcp.io/v1alpha1/apibindings')
+        http.Get(
+          'http://kcp-apiexport-proxy.kcp-apiexport-proxy.svc:8080/apiexportendpointslices/example.com/clusters/'
+            + variables.cluster + '/apis/apis.kcp.io/v1alpha1/apibindings',
+          {'Authorization': 'Bearer ' + variables.token})
   validations:
     - expression: "has(variables.apiBindings.items) && variables.apiBindings.items.size() > 0"
       message: >-
