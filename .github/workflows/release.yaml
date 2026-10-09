@@ -49,15 +49,13 @@ jobs:
         run: echo "$GITHUB_TOKEN" | docker login ghcr.io --username "$GITHUB_ACTOR" --password-stdin
       - run: docker push "$IMAGE:$VERSION"
       - env:
-          REGISTRY_USERNAME: ${{ github.actor }}
-          REGISTRY_PASSWORD: ${{ secrets.GITHUB_TOKEN }}
-        run: ./build/release-chart.sh "$VERSION"
-      - env:
           GH_TOKEN: ${{ secrets.GITHUB_TOKEN }}
         run: |
           gh release create "$VERSION" \
             --repo "$GITHUB_REPOSITORY" \
             --verify-tag \
             --generate-notes \
-            _output/kcp-apiexport-proxy_"$VERSION"_linux_amd64.tar.gz \
-            _output/kcp-apiexport-proxy_"$VERSION"_linux_amd64.tar.gz.sha256
+            _output/kcp-apiexport-proxy-"$VERSION"-linux-amd64.tar.gz \
+            _output/kcp-apiexport-proxy-"$VERSION"-linux-amd64.tar.gz.sha256 \
+            _output/kcp-apiexport-proxy-"$VERSION"-helm-chart.tar.gz \
+            _output/kcp-apiexport-proxy-"$VERSION"-helm-chart.tar.gz.sha256
