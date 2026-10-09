@@ -405,6 +405,16 @@ func TestRunWithTLSAndToken(t *testing.T) {
 		}
 	}
 
+	for token, want := range map[string]int{"": http.StatusUnauthorized, "secret": http.StatusOK} {
+		code, _, err := do(t.Context(), "/metrics", token)
+		if err != nil {
+			t.Fatalf("/metrics with token %q: %v", token, err)
+		}
+		if code != want {
+			t.Fatalf("/metrics with token %q: got status %d, want %d", token, code, want)
+		}
+	}
+
 	code, _, err = do(t.Context(), "/apiexportendpointslices/slice-a/clusters/unknown/api/v1/configmaps", "")
 	if err != nil {
 		t.Fatalf("request for unknown cluster without token: %v", err)

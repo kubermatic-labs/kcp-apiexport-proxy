@@ -70,7 +70,8 @@ provider workspace, read the `APIExportEndpointSlices` and read the
 APIExports' content (`apiexports/content`), rather than an admin.
 
 Besides the proxied `/apiexportendpointslices/...` paths, the server exposes `/healthz`,
-`/readyz` and `/metrics`, which never require the token.
+`/readyz` and `/metrics`. `/metrics` requires the token when `--token-file` is
+set; `/healthz` and `/readyz` never do, so that probes keep working.
 
 Every request to a proxied path is logged at the default log level, with its
 method, path, response status, duration, client address and user agent; the

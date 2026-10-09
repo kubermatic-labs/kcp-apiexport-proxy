@@ -84,12 +84,15 @@ func NewServer(c CompletedConfig) (*Server, error) {
 	handler = lookup.WithClusterResolver(handler, indexes)
 	handler = methods.WithAllowed(handler, c.Options.AllowedHTTPMethods)
 
+	metricsHandler := metrics.Handler()
+
 	if c.Options.TokenFile != "" {
 		tokenFile := filereload.New(c.Options.TokenFile)
 		if _, _, err := tokenFile.Load(); err != nil {
 			return nil, fmt.Errorf("failed to load token: %w", err)
 		}
 		handler = auth.WithToken(handler, tokenFile)
+		metricsHandler = auth.WithToken(metricsHandler, tokenFile)
 	}
 
 	if c.Options.TLSCertFile != "" {
@@ -103,7 +106,7 @@ func NewServer(c CompletedConfig) (*Server, error) {
 	handler = accesslog.WithLogging(handler)
 
 	mux := http.NewServeMux()
-	mux.Handle("/metrics", metrics.Handler())
+	mux.Handle("/metrics", metricsHandler)
 	mux.HandleFunc("/healthz", func(w http.ResponseWriter, _ *http.Request) {
 		w.WriteHeader(http.StatusOK)
 	})
