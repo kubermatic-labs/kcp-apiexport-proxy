@@ -42,13 +42,14 @@ fi
 
 mkdir -p "$BUILD_DEST"
 
+VERSION_VAR="$(go list -m)/pkg/version.Version"
 GOOS="$(go env GOOS)"
 GOARCH="$(go env GOARCH)"
 
 for cmd in "$@"; do
   # shellcheck disable=SC2086
   go build $GOBUILDFLAGS \
-    -ldflags "$LDFLAGS -X github.com/kubermatic-labs/kcp-apiexport-proxy/pkg/version.Version=$VERSION" \
+    -ldflags "$LDFLAGS -X $VERSION_VAR=$VERSION" \
     -o "$BUILD_DEST/$cmd" "./cmd/$cmd"
 
   archive="${cmd}-${VERSION}-${GOOS}-${GOARCH}.tar.gz"

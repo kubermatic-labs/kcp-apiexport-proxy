@@ -43,7 +43,13 @@ jobs:
         with:
           go-version-file: go.mod
       - run: GOOS=linux GOARCH=amd64 make build
-      - run: docker build --platform linux/amd64 --file build/Dockerfile --tag "$IMAGE:$VERSION" _output
+      - run: |
+          docker build \
+            --platform linux/amd64 \
+            --file build/Dockerfile \
+            --label "org.opencontainers.image.source=$GITHUB_SERVER_URL/$GITHUB_REPOSITORY" \
+            --tag "$IMAGE:$VERSION" \
+            _output
       - env:
           GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
         run: echo "$GITHUB_TOKEN" | docker login ghcr.io --username "$GITHUB_ACTOR" --password-stdin
