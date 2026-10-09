@@ -30,6 +30,7 @@ test-integration:
 .PHONY: verify
 verify:
 	./hack/verify-boilerplate.sh
+	./hack/verify-chart.sh
 	./hack/verify-dependencies.sh
 	./hack/verify-unicode.sh
 	./hack/verify-import-order.sh

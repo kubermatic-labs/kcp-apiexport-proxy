@@ -1,0 +1,129 @@
+# Copyright The kcp-apiexport-proxy Authors.
+#
+# Licensed under the Apache License, Version 2.0 (the "License");
+# you may not use this file except in compliance with the License.
+# You may obtain a copy of the License at
+#
+#     http://www.apache.org/licenses/LICENSE-2.0
+#
+# Unless required by applicable law or agreed to in writing, software
+# distributed under the License is distributed on an "AS IS" BASIS,
+# WITHOUT WARRANTIES OR CONDITIONS OF ANY KIND, either express or implied.
+# See the License for the specific language governing permissions and
+# limitations under the License.
+
+{{- if not .Values.apiExportEndpointSliceNames }}
+{{- fail "apiExportEndpointSliceNames must contain at least one name" }}
+{{- end }}
+apiVersion: apps/v1
+kind: Deployment
+metadata:
+  name: {{ include "kcp-apiexport-proxy.fullname" . }}
+  namespace: {{ .Release.Namespace }}
+  labels:
+    {{- include "kcp-apiexport-proxy.labels" . | nindent 4 }}
+spec:
+  replicas: {{ .Values.replicas }}
+  selector:
+    matchLabels:
+      {{- include "kcp-apiexport-proxy.selectorLabels" . | nindent 6 }}
+  template:
+    metadata:
+      labels:
+        {{- include "kcp-apiexport-proxy.labels" . | nindent 8 }}
+      {{- with .Values.podAnnotations }}
+      annotations:
+        {{- toYaml . | nindent 8 }}
+      {{- end }}
+    spec:
+      automountServiceAccountToken: false
+      {{- with .Values.imagePullSecrets }}
+      imagePullSecrets:
+        {{- toYaml . | nindent 8 }}
+      {{- end }}
+      securityContext:
+        runAsNonRoot: true
+        seccompProfile:
+          type: RuntimeDefault
+      containers:
+        - name: proxy
+          image: "{{ .Values.image.repository }}:{{ .Values.image.tag | default .Chart.AppVersion }}"
+          imagePullPolicy: {{ .Values.image.pullPolicy }}
+          args:
+            - --kubeconfig=/etc/kcp-apiexport-proxy/kubeconfig/{{ .Values.kubeconfig.key }}
+            - --apiexportendpointslice-names={{ join "," .Values.apiExportEndpointSliceNames }}
+            - --bind-address=:8080
+            {{- if .Values.tls.enabled }}
+            - --tls-cert-file=/etc/kcp-apiexport-proxy/tls/tls.crt
+            - --tls-key-file=/etc/kcp-apiexport-proxy/tls/tls.key
+            {{- end }}
+            {{- if .Values.token.enabled }}
+            - --token-file=/etc/kcp-apiexport-proxy/token/{{ .Values.token.key }}
+            {{- end }}
+            {{- with .Values.extraArgs }}
+            {{- toYaml . | nindent 12 }}
+            {{- end }}
+          ports:
+            - name: {{ include "kcp-apiexport-proxy.scheme" . }}
+              containerPort: 8080
+          livenessProbe:
+            httpGet:
+              path: /healthz
+              port: {{ include "kcp-apiexport-proxy.scheme" . }}
+              scheme: {{ include "kcp-apiexport-proxy.scheme" . | upper }}
+          readinessProbe:
+            httpGet:
+              path: /readyz
+              port: {{ include "kcp-apiexport-proxy.scheme" . }}
+              scheme: {{ include "kcp-apiexport-proxy.scheme" . | upper }}
+            periodSeconds: 5
+          securityContext:
+            allowPrivilegeEscalation: false
+            readOnlyRootFilesystem: true
+            capabilities:
+              drop:
+                - ALL
+          {{- with .Values.resources }}
+          resources:
+            {{- toYaml . | nindent 12 }}
+          {{- end }}
+          volumeMounts:
+            - name: kubeconfig
+              mountPath: /etc/kcp-apiexport-proxy/kubeconfig
+              readOnly: true
+            {{- if .Values.tls.enabled }}
+            - name: tls
+              mountPath: /etc/kcp-apiexport-proxy/tls
+              readOnly: true
+            {{- end }}
+            {{- if .Values.token.enabled }}
+            - name: token
+              mountPath: /etc/kcp-apiexport-proxy/token
+              readOnly: true
+            {{- end }}
+      volumes:
+        - name: kubeconfig
+          secret:
+            secretName: {{ required "kubeconfig.secretName is required" .Values.kubeconfig.secretName }}
+        {{- if .Values.tls.enabled }}
+        - name: tls
+          secret:
+            secretName: {{ include "kcp-apiexport-proxy.tlsSecretName" . }}
+        {{- end }}
+        {{- if .Values.token.enabled }}
+        - name: token
+          secret:
+            secretName: {{ include "kcp-apiexport-proxy.tokenSecretName" . }}
+        {{- end }}
+      {{- with .Values.nodeSelector }}
+      nodeSelector:
+        {{- toYaml . | nindent 8 }}
+      {{- end }}
+      {{- with .Values.tolerations }}
+      tolerations:
+        {{- toYaml . | nindent 8 }}
+      {{- end }}
+      {{- with .Values.affinity }}
+      affinity:
+        {{- toYaml . | nindent 8 }}
+      {{- end }}

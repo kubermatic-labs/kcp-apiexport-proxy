@@ -15,19 +15,20 @@
 # limitations under the License.
 
 # This script creates a kind cluster and deploys kcp, Kyverno and the proxy
-# into it. It then publishes an APIExport from one kcp workspace, binds it in
+# (using its Helm chart, with a token) into it. See test/README.md. It then publishes an APIExport from one kcp workspace, binds it in
 # another, and checks that
 #   - the consumer workspace's objects can be read through the proxy, and
 #   - a Kyverno policy can use the proxy to admit or deny objects based on
 #     their "kcp.io/cluster" annotation.
 #
-# Requires Docker. kind, kubectl and Kyverno are used at the versions pinned
-# in hack/lib.sh.
+# Requires Docker and curl. kind, kubectl, helm and Kyverno are used at the
+# versions pinned in hack/lib.sh.
 #
 # Environment variables:
 #   KIND_CLUSTER_NAME  name of the kind cluster (default kcp-apiexport-proxy)
 #   KEEP_CLUSTER       set to true to keep the cluster after the run; its
 #                      kubeconfig is in _output/kind-$KIND_CLUSTER_NAME.kubeconfig
+#   PROXY_LOCAL_PORT   local port to forward to the proxy (default 18080)
 
 set -euo pipefail
 
@@ -36,6 +37,7 @@ source hack/lib.sh
 
 KIND_CLUSTER_NAME="${KIND_CLUSTER_NAME:-kcp-apiexport-proxy}"
 KEEP_CLUSTER="${KEEP_CLUSTER:-false}"
+PROXY_LOCAL_PORT="${PROXY_LOCAL_PORT:-18080}"
 
 MANIFESTS=test/manifests
 IMAGE=kcp-apiexport-proxy:test
@@ -44,9 +46,14 @@ export KUBECONFIG="$ROOT_DIR/_output/kind-$KIND_CLUSTER_NAME.kubeconfig"
 
 WORK_DIR="$(mktemp -d)"
 CLUSTER_CREATED=false
+PORT_FORWARD_PID=""
 
 cleanup() {
   local rc=$?
+
+  if [ -n "$PORT_FORWARD_PID" ]; then
+    kill "$PORT_FORWARD_PID" 2> /dev/null || true
+  fi
 
   if [ "$rc" -ne 0 ] && [ "$CLUSTER_CREATED" = "true" ]; then
     echodate "Test failed, printing logs..."
@@ -75,8 +82,14 @@ if ! docker info > /dev/null 2>&1; then
   exit 1
 fi
 
+if ! command -v curl > /dev/null 2>&1; then
+  echodate "curl is not available, but is required to talk to the proxy."
+  exit 1
+fi
+
 ensure_kind
 ensure_kubectl
+ensure_helm
 export PATH="$TOOLS_DIR:$PATH"
 
 echodate "Building the proxy image..."
@@ -143,16 +156,60 @@ kubectl --kubeconfig="$PROXY_KUBECONFIG" config set-cluster root \
   --server=https://kcp.kcp.svc.cluster.local:6443/clusters/root:provider \
   --insecure-skip-tls-verify=true > /dev/null
 
-kubectl apply -f "$MANIFESTS/cluster/proxy.yaml"
+kubectl create namespace kcp-apiexport-proxy
 kubectl -n kcp-apiexport-proxy create secret generic kcp-apiexport-proxy-kubeconfig \
   --from-file=kubeconfig="$PROXY_KUBECONFIG"
-kubectl -n kcp-apiexport-proxy rollout status deployment/kcp-apiexport-proxy --timeout=120s
 
-# proxy_get <path> sends a GET request to the proxy through the kind
-# cluster's API server service proxy. <path> is relative to the
-# example.com APIExportEndpointSlice.
+helm upgrade --install kcp-apiexport-proxy deploy/charts/kcp-apiexport-proxy \
+  --namespace kcp-apiexport-proxy \
+  --values "$MANIFESTS/cluster/proxy-values.yaml"
+kubectl -n kcp-apiexport-proxy rollout status deployment/kcp-apiexport-proxy --timeout=180s
+
+PROXY_TOKEN="$(kubectl -n kcp-apiexport-proxy get secret kcp-apiexport-proxy-token -o jsonpath='{.data.token}' | base64 -d)"
+
+kubectl -n kcp-apiexport-proxy port-forward service/kcp-apiexport-proxy "$PROXY_LOCAL_PORT:8080" > /dev/null &
+PORT_FORWARD_PID=$!
+
+# proxy_curl <token> <path> sends a GET request to the proxy through the
+# port-forward and prints the HTTP status code followed by the body. <path>
+# is relative to the example.com APIExportEndpointSlice; an empty <token>
+# sends none.
+proxy_curl() {
+  local token="$1"
+  local path="$2"
+  local args=(
+    --silent --show-error
+    --write-out '%{http_code}\n'
+    --output "$WORK_DIR/response"
+  )
+  if [ -n "$token" ]; then
+    args+=(--header "Authorization: Bearer $token")
+  fi
+
+  curl "${args[@]}" "http://127.0.0.1:$PROXY_LOCAL_PORT/apiexportendpointslices/example.com$path"
+  cat "$WORK_DIR/response"
+}
+
+# proxy_get <path> succeeds if GET <path> with the token returns 200, and
+# prints the body.
 proxy_get() {
-  kubectl get --raw "/api/v1/namespaces/kcp-apiexport-proxy/services/http:kcp-apiexport-proxy:http/proxy/apiexportendpointslices/example.com$1"
+  local output
+  output="$(proxy_curl "$PROXY_TOKEN" "$1")" || return 1
+  [ "$(head -n 1 <<< "$output")" = "200" ] || return 1
+  tail -n +2 <<< "$output"
+}
+
+# expect_status <token> <path> <status> checks that GET <path> with the
+# given token returns the given HTTP status code.
+expect_status() {
+  local output status
+  output="$(proxy_curl "$1" "$2")"
+  status="$(head -n 1 <<< "$output")"
+  if [ "$status" != "$3" ]; then
+    echodate "GET $2 returned $status, expected $3."
+    return 1
+  fi
+  echodate "GET $2 returned $3."
 }
 
 # expect_through_proxy <path> <string> checks that GET <path> through the
@@ -177,14 +234,15 @@ expect_through_proxy "/clusters/$CONSUMER_CLUSTER/apis/example.com/v1/widgets" '
 expect_through_proxy "/clusters/$CONSUMER_CLUSTER/apis/example.com/v1/namespaces/default/widgets/my-widget" '"color": *"blue"'
 expect_through_proxy "/clusters/$CONSUMER_CLUSTER/apis/apis.kcp.io/v1alpha1/apibindings" '"name": *"example.com"'
 
-if proxy_get "/clusters/does-not-exist/apis/example.com/v1/widgets" > /dev/null 2>&1; then
-  echodate "Expected a request for an unknown logical cluster to fail."
-  exit 1
-fi
-echodate "Request for an unknown logical cluster was rejected."
+expect_status "$PROXY_TOKEN" "/clusters/does-not-exist/apis/example.com/v1/widgets" 404
+
+echodate "Checking that requests without a valid token are rejected..."
+expect_status "" "/clusters/$CONSUMER_CLUSTER/apis/example.com/v1/widgets" 401
+expect_status "wrong-token" "/clusters/$CONSUMER_CLUSTER/apis/example.com/v1/widgets" 401
 
 echodate "Waiting for Kyverno..."
 kubectl -n kyverno wait --for=condition=Available deployment --all --timeout=300s
+kubectl apply -f "$MANIFESTS/cluster/kyverno-rbac.yaml"
 kubectl apply -f "$MANIFESTS/cluster/policy.yaml"
 
 # create_configmap <name> <cluster> creates a ConfigMap in the default

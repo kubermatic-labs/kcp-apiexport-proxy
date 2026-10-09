@@ -63,8 +63,8 @@ func (o *Options) AddFlags(fs *pflag.FlagSet) {
 		"The address the proxy listens on.")
 	fs.StringVar(&o.TokenFile, "token-file", o.TokenFile,
 		"The path to a file containing the bearer token clients must send to use the proxied paths. "+
-			"The file is re-read when it changes. Requires --tls-cert-file and --tls-key-file. "+
-			"If not set, the proxy performs no authentication.")
+			"The file is re-read when it changes. Use it together with --tls-cert-file and --tls-key-file, "+
+			"otherwise the token is sent in plain text. If not set, the proxy performs no authentication.")
 	fs.StringVar(&o.TLSCertFile, "tls-cert-file", o.TLSCertFile,
 		"The path to the PEM encoded serving certificate. The file is re-read when it changes. "+
 			"If not set, the proxy serves plain HTTP.")
@@ -88,9 +88,6 @@ func (o *Options) Validate() []error {
 
 	if (o.TLSCertFile == "") != (o.TLSKeyFile == "") {
 		errs = append(errs, fmt.Errorf("--tls-cert-file and --tls-key-file must be set together"))
-	}
-	if o.TokenFile != "" && o.TLSCertFile == "" {
-		errs = append(errs, fmt.Errorf("--token-file requires --tls-cert-file and --tls-key-file"))
 	}
 
 	seen := make(map[string]bool, len(o.APIExportEndpointSliceNames))

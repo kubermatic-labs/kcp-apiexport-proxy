@@ -21,7 +21,8 @@ stable URL through which they can reach any logical cluster bound to those
 By default the proxy serves plain HTTP and performs **no authentication**.
 With `--token-file`, clients must send `Authorization: Bearer <token>` to use
 the proxied paths, and with `--tls-cert-file` and `--tls-key-file` the proxy
-serves HTTPS; a token requires TLS. All three files are reloaded when they
+serves HTTPS. A token without TLS works but is sent in plain text, so the
+proxy logs a warning. All three files are reloaded when they
 change, for example when they are mounted from Secrets. The proxy never
 forwards a client's `Authorization` or `Impersonate-*` headers to kcp.
 
@@ -31,7 +32,7 @@ forwards a client's `Authorization` or `Impersonate-*` headers to kcp.
 | --- | --- |
 | `make build` | Builds the binaries in `cmd/` with the local Go toolchain into `_output/`, plus a `.tar.gz` archive of each binary and its `.sha256` checksum. |
 | `make test` | Runs all unit tests. |
-| `make test-integration` | Runs [test/test-integration.sh](test/test-integration.sh), which deploys kcp, Kyverno and the proxy into a kind cluster and checks the proxy end to end. Needs Docker. |
+| `make test-integration` | Runs [test/test-integration.sh](test/test-integration.sh), which deploys kcp, Kyverno and the proxy (via its Helm chart) into a kind cluster and checks the proxy end to end, see [test/README.md](test/README.md). Needs Docker and curl. |
 | `make verify` | Runs all `hack/verify-*.sh` scripts (boilerplate, dependencies, unicode, import order, lint). |
 
 Tools needed by the scripts (including kind and kubectl) are downloaded on first use at the pinned
@@ -56,7 +57,7 @@ _output/kcp-apiexport-proxy \
 | `--kubeconfig` | Kubeconfig whose current context points at the workspace containing the `APIExportEndpointSlice`; also used as the identity for all requests to shards. Required. |
 | `--apiexportendpointslice-names` | Comma-separated names of the `APIExportEndpointSlices` to watch, all in the kubeconfig's workspace. Required. |
 | `--bind-address` | Listen address (default `:8080`). |
-| `--token-file` | File containing the bearer token clients must send for the proxied paths; reloaded when it changes. Requires `--tls-cert-file` and `--tls-key-file`. Optional, no authentication if not set. |
+| `--token-file` | File containing the bearer token clients must send for the proxied paths; reloaded when it changes. Should be combined with TLS, otherwise the token is sent in plain text. Optional, no authentication if not set. |
 | `--tls-cert-file` | PEM encoded serving certificate; reloaded when it changes. Optional, plain HTTP if not set. |
 | `--tls-key-file` | PEM encoded private key for `--tls-cert-file`; reloaded when it changes. Required with `--tls-cert-file`. |
 | `--version` | Prints the version and exits. |
@@ -70,6 +71,23 @@ Example request:
 curl --cacert /path/to/ca.crt \
   --header "Authorization: Bearer $(cat /path/to/token)" \
   https://localhost:8443/apiexportendpointslices/my-export/clusters/<logical-cluster>/apis/apis.kcp.io/v1alpha1/apibindings
+```
+
+## Helm chart
+
+[deploy/charts/kcp-apiexport-proxy](deploy/charts/kcp-apiexport-proxy) deploys
+the proxy with two replicas. It expects an existing Secret with the kubeconfig
+(`kubeconfig.secretName`) and the names of the APIExportEndpointSlices
+(`apiExportEndpointSliceNames`). By default it generates a token Secret
+(`<release>-token`) and serves plain HTTP; `tls.enabled=true` serves HTTPS
+with a certificate from cert-manager instead. HTTP is the default because
+Kyverno policies can't use a custom CA yet, see [test/README.md](test/README.md).
+
+```sh
+helm install kcp-apiexport-proxy deploy/charts/kcp-apiexport-proxy \
+  --namespace kcp-system \
+  --set 'apiExportEndpointSliceNames={my-export}' \
+  --set kubeconfig.secretName=my-kcp-kubeconfig
 ```
 
 A sample Kyverno `ValidatingPolicy` that uses the proxy can be found in

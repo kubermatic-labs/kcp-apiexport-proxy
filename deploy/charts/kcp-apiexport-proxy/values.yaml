@@ -1,0 +1,68 @@
+# Copyright The kcp-apiexport-proxy Authors.
+#
+# Licensed under the Apache License, Version 2.0 (the "License");
+# you may not use this file except in compliance with the License.
+# You may obtain a copy of the License at
+#
+#     http://www.apache.org/licenses/LICENSE-2.0
+#
+# Unless required by applicable law or agreed to in writing, software
+# distributed under the License is distributed on an "AS IS" BASIS,
+# WITHOUT WARRANTIES OR CONDITIONS OF ANY KIND, either express or implied.
+# See the License for the specific language governing permissions and
+# limitations under the License.
+
+image:
+  repository: ghcr.io/kubermatic-labs/kcp-apiexport-proxy
+  # Defaults to the chart's appVersion.
+  tag: ""
+  pullPolicy: IfNotPresent
+
+imagePullSecrets: []
+
+replicas: 2
+
+# Names of the APIExportEndpointSlices to proxy, all in the workspace the
+# kubeconfig points at. Required.
+apiExportEndpointSliceNames: []
+
+kubeconfig:
+  # Name of an existing Secret holding the kubeconfig for kcp. Its current
+  # context must point at the workspace containing the
+  # APIExportEndpointSlices, and its identity is used for all requests to
+  # kcp. Required.
+  secretName: ""
+  key: kubeconfig
+
+token:
+  # Require clients to send "Authorization: Bearer <token>". Without TLS the
+  # token is sent in plain text.
+  enabled: true
+  # Name of an existing Secret holding the token. If empty, the chart
+  # generates a random token into the Secret "<fullname>-token" and keeps it
+  # across upgrades.
+  existingSecret: ""
+  key: token
+
+tls:
+  # Serve HTTPS with a certificate from cert-manager, which must be
+  # installed. Disabled by default because Kyverno can't use a custom CA yet,
+  # see test/README.md.
+  enabled: false
+  # cert-manager issuer for the serving certificate, e.g.
+  # {name: my-issuer, kind: ClusterIssuer}. If empty, the chart creates a
+  # self-signed CA. Either way the certificate and its CA end up in the
+  # Secret "<fullname>-tls" (tls.crt, tls.key, ca.crt).
+  issuerRef: {}
+
+service:
+  type: ClusterIP
+  port: 8080
+
+extraArgs: []
+
+podAnnotations: {}
+resources: {}
+nodeSelector: {}
+tolerations: []
+affinity: {}

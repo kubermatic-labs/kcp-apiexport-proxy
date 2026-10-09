@@ -21,6 +21,7 @@ TOOLS_DIR="${TOOLS_DIR:-$ROOT_DIR/_output/tools}"
 BOILERPLATE_VERSION="0.3.0"
 GIMPS_VERSION="0.6.2"
 GOLANGCI_LINT_VERSION="2.14.0"
+HELM_VERSION="4.3.0"
 KIND_VERSION="0.33.0"
 KIND_NODE_IMAGE="kindest/node:v1.36.4@sha256:099e049362a1526b2db71494e1947aae99bd16290d7c895f2b7ea312e3cbfaed"
 KUBECTL_VERSION="1.36.5"
@@ -103,6 +104,12 @@ ensure_golangci_lint() {
   install_tool golangci-lint "$GOLANGCI_LINT_VERSION" \
     "https://github.com/golangci/golangci-lint/releases/download/v${GOLANGCI_LINT_VERSION}/golangci-lint-${GOLANGCI_LINT_VERSION}-${OS}-${ARCH}.tar.gz" \
     "golangci-lint-${GOLANGCI_LINT_VERSION}-${OS}-${ARCH}/golangci-lint"
+}
+
+ensure_helm() {
+  install_tool helm "$HELM_VERSION" \
+    "https://get.helm.sh/helm-v${HELM_VERSION}-${OS}-${ARCH}.tar.gz" \
+    "${OS}-${ARCH}/helm"
 }
 
 ensure_kind() {
