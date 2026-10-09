@@ -34,9 +34,10 @@ import (
 // the index of the named APIExportEndpointSlice in indexes, storing the
 // resolved shard virtual workspace URL in the request context (see
 // WithShardURL/ShardURLFrom) before calling delegate. Requests for unknown
-// slices or clusters, or that don't match that path, get a 404 - this proxy
-// performs no authentication or authorization, so there's no "forbidden"
-// framing to fall back to, unlike upstream/pkg/proxy/lookup.
+// slices or clusters, or that don't match that path, get a 404. Clients are
+// authenticated (if at all) before this handler, and there is no per-cluster
+// authorization, so there's no "forbidden" framing to fall back to, unlike
+// upstream/pkg/proxy/lookup.
 func WithClusterResolver(delegate http.Handler, indexes map[string]index.Index) http.Handler {
 	mux := http.NewServeMux()
 

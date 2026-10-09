@@ -20,6 +20,7 @@ import (
 	"fmt"
 	"net/http"
 	"net/http/httputil"
+	"strings"
 
 	utilruntime "k8s.io/apimachinery/pkg/util/runtime"
 	"k8s.io/client-go/rest"
@@ -55,6 +56,16 @@ func newShardReverseProxy(transport http.RoundTripper) *httputil.ReverseProxy {
 			pr.Out.URL.Scheme = "https"
 			pr.Out.URL.Host = "notfound"
 			return
+		}
+
+		// The proxy always talks to shards with its own identity, so
+		// credentials and impersonation requested by the client must not
+		// be forwarded.
+		pr.Out.Header.Del("Authorization")
+		for header := range pr.Out.Header {
+			if strings.HasPrefix(header, "Impersonate-") {
+				pr.Out.Header.Del(header)
+			}
 		}
 
 		pr.Out.URL.Scheme = shardURL.Scheme

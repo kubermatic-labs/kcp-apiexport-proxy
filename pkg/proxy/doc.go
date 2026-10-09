@@ -14,7 +14,7 @@ See the License for the specific language governing permissions and
 limitations under the License.
 */
 
-// Package proxy provides an unauthenticated reverse proxy that sits in front
+// Package proxy provides a reverse proxy that sits in front
 // of the shard-specific virtual workspace endpoints of one or more kcp
 // APIExports. For each named APIExportEndpointSlice it watches the set of
 // per-shard virtual workspace URLs, watches APIBindings through each of
