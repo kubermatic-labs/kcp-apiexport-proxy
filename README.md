@@ -25,7 +25,7 @@ to be reachable only from trusted in-cluster clients.
 
 | Target | Description |
 | --- | --- |
-| `make build` | Builds the binaries in `cmd/` with the local Go toolchain into `_output/`. |
+| `make build` | Builds the binaries in `cmd/` with the local Go toolchain into `_output/`, plus a `.tar.gz` archive of each binary and its `.sha256` checksum. |
 | `make test` | Runs all unit tests. |
 | `make test-integration` | Runs [test/test-integration.sh](test/test-integration.sh), which deploys kcp, Kyverno and the proxy into a kind cluster and checks the proxy end to end. Needs Docker. |
 | `make verify` | Runs all `hack/verify-*.sh` scripts (boilerplate, dependencies, unicode, import order, lint). |
