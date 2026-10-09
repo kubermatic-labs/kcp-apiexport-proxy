@@ -59,6 +59,12 @@ tls:
   # Secret "<fullname>-tls" (tls.crt, tls.key, ca.crt).
   issuerRef: {}
 
+networkPolicy:
+  # Namespaces whose pods may connect to the proxy, e.g. [kyverno]. If set,
+  # a NetworkPolicy denies all other ingress; this needs a network plugin
+  # that enforces NetworkPolicies. If empty, no NetworkPolicy is created.
+  allowedNamespaces: []
+
 service:
   type: ClusterIP
   port: 8080
