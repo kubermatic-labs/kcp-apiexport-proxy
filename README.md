@@ -31,7 +31,7 @@ by default only accepts `GET` requests (`--allowed-http-methods`).
 
 | Target | Description |
 | --- | --- |
-| `make build` | Builds the binaries in `cmd/` with the local Go toolchain into `_output/`, plus a `.tar.gz` archive of each binary and its `.sha256` checksum. |
+| `make build` | Builds the binaries in `cmd/` with the local Go toolchain into `_output/`, plus a `.tar.gz` archive of each binary and the packaged Helm chart (`-helm-chart.tar.gz`), each with a `.sha256` checksum ([build/build.sh](build/build.sh)). |
 | `make test` | Runs all unit tests. |
 | `make test-integration` | Runs [test/test-integration.sh](test/test-integration.sh), which deploys kcp, Kyverno and the proxy (via its Helm chart) into a kind cluster and checks the proxy end to end, see [test/README.md](test/README.md). Needs Docker and curl. |
 | `make verify` | Runs all `hack/verify-*.sh` scripts (boilerplate, dependencies, unicode, import order, lint). |
@@ -102,18 +102,20 @@ Pushing a tag that starts with `v` (e.g. `v0.1.0`) runs the
 
 1. builds the linux/amd64 binary with the tag as its version,
 2. pushes the image `ghcr.io/kubermatic-labs/kcp-apiexport-proxy:<tag>`,
-3. pushes the Helm chart to `oci://ghcr.io/kubermatic-labs/charts/kcp-apiexport-proxy`
-   with the tag without the `v` as chart version (e.g. `0.1.0`) and the tag
-   as appVersion, so the chart defaults to the matching image
-   ([build/release-chart.sh](build/release-chart.sh)),
-4. creates a GitHub Release with generated notes and the
-   `kcp-apiexport-proxy_<tag>_linux_amd64.tar.gz` archive plus its `.sha256`.
+3. packages the Helm chart with the tag as both chart version and appVersion,
+   so the chart defaults to the matching image,
+4. creates a GitHub Release with generated notes and these assets:
+   - `kcp-apiexport-proxy-<tag>-linux-amd64.tar.gz`, the binary for
+     linux/amd64,
+   - `kcp-apiexport-proxy-<tag>-helm-chart.tar.gz`, the Helm chart,
+   - a `.sha256` checksum file for each of them.
 
 ```sh
 git tag v0.1.0
 git push origin v0.1.0
 
-helm install kcp-apiexport-proxy oci://ghcr.io/kubermatic-labs/charts/kcp-apiexport-proxy --version 0.1.0 ...
+curl -LO https://github.com/kubermatic-labs/kcp-apiexport-proxy/releases/download/v0.1.0/kcp-apiexport-proxy-v0.1.0-helm-chart.tar.gz
+helm install kcp-apiexport-proxy ./kcp-apiexport-proxy-v0.1.0-helm-chart.tar.gz ...
 ```
 
 ## License
