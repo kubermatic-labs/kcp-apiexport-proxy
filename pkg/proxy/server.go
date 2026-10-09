@@ -36,6 +36,17 @@ import (
 	"github.com/kubermatic-labs/kcp-apiexport-proxy/pkg/proxy/metrics"
 )
 
+const (
+	// readHeaderTimeout limits how long a client may take to send the
+	// request headers, so slow clients can't hold connections open.
+	readHeaderTimeout = 10 * time.Second
+
+	// idleTimeout limits how long an idle keep-alive connection stays
+	// open. There is deliberately no write timeout, as it would cut off
+	// long-running watch requests.
+	idleTimeout = 120 * time.Second
+)
+
 type Server struct {
 	CompletedConfig
 	Handler http.Handler
@@ -156,8 +167,10 @@ func (s preparedServer) Run(ctx context.Context) error {
 	}
 
 	httpServer := &http.Server{
-		Addr:    s.Options.BindAddress,
-		Handler: s.Handler,
+		Addr:              s.Options.BindAddress,
+		Handler:           s.Handler,
+		ReadHeaderTimeout: readHeaderTimeout,
+		IdleTimeout:       idleTimeout,
 	}
 
 	if s.Options.TokenFile != "" && s.KeyPair == nil {
