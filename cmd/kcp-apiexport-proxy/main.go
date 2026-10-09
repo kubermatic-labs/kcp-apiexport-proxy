@@ -31,6 +31,7 @@ import (
 
 	"github.com/kcp-dev/contrib-apiexport-proxy/pkg/proxy"
 	proxyoptions "github.com/kcp-dev/contrib-apiexport-proxy/pkg/proxy/options"
+	"github.com/kcp-dev/contrib-apiexport-proxy/pkg/version"
 )
 
 func main() {
@@ -51,8 +52,9 @@ func NewProxyCommand() *cobra.Command {
 	options := proxyoptions.NewOptions()
 
 	cmd := &cobra.Command{
-		Use:   "kcp-apiexport-proxy",
-		Short: "Unauthenticated reverse proxy for kcp APIExports' virtual workspace endpoints",
+		Use:     "kcp-apiexport-proxy",
+		Version: version.Version,
+		Short:   "Unauthenticated reverse proxy for kcp APIExports' virtual workspace endpoints",
 		Long: `kcp-apiexport-proxy watches the named APIExportEndpointSlices for their shard
 virtual workspace URLs, watches APIBindings through each of them to learn
 which logical cluster lives behind which shard, and forwards
