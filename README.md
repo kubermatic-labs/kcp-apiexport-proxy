@@ -64,6 +64,11 @@ _output/kcp-apiexport-proxy \
 | `--tls-key-file` | PEM encoded private key for `--tls-cert-file`; reloaded when it changes. Required with `--tls-cert-file`. |
 | `--version` | Prints the version and exits. |
 
+Every proxied request is sent with the kubeconfig's identity, so use a
+dedicated, least-privileged kcp user for it: one that can only access the
+provider workspace, read the `APIExportEndpointSlices` and read the
+APIExports' content (`apiexports/content`), rather than an admin.
+
 Besides the proxied `/apiexportendpointslices/...` paths, the server exposes `/healthz`,
 `/readyz` and `/metrics`, which never require the token.
 
