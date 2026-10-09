@@ -28,8 +28,8 @@ import (
 	"k8s.io/apimachinery/pkg/util/wait"
 	"k8s.io/client-go/rest"
 
-	"github.com/kcp-dev/contrib-apiexport-proxy/pkg/proxy/internal/fakekcp"
-	proxyoptions "github.com/kcp-dev/contrib-apiexport-proxy/pkg/proxy/options"
+	"github.com/kubermatic-labs/kcp-apiexport-proxy/pkg/proxy/internal/fakekcp"
+	proxyoptions "github.com/kubermatic-labs/kcp-apiexport-proxy/pkg/proxy/options"
 )
 
 // newTestFakeKCP returns a fake kcp with two APIExportEndpointSlices: slice-a
