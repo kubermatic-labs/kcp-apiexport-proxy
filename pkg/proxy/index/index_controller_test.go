@@ -18,6 +18,11 @@ package index
 
 import (
 	"context"
+	"io"
+	"net/http"
+	"net/http/httptest"
+	"strconv"
+	"strings"
 	"testing"
 	"time"
 
@@ -29,12 +34,42 @@ import (
 	apisv1alpha1 "github.com/kcp-dev/sdk/apis/apis/v1alpha1"
 
 	"github.com/kubermatic-labs/kcp-apiexport-proxy/pkg/proxy/internal/fakekcp"
+	"github.com/kubermatic-labs/kcp-apiexport-proxy/pkg/proxy/metrics"
 )
 
 func newTestController() *Controller {
 	return &Controller{
 		clusterURLs: map[logicalcluster.Name]string{},
 	}
+}
+
+// indexSize returns the endpoints and logical clusters gauges for slice, as
+// exposed by the metrics handler.
+func indexSize(t *testing.T, slice string) (endpoints, clusters float64) {
+	t.Helper()
+
+	rec := httptest.NewRecorder()
+	metrics.Handler().ServeHTTP(rec, httptest.NewRequestWithContext(t.Context(), http.MethodGet, "/metrics", nil))
+	body, err := io.ReadAll(rec.Body)
+	if err != nil {
+		t.Fatalf("failed to read metrics: %v", err)
+	}
+
+	value := func(name string) float64 {
+		prefix := name + `{slice="` + slice + `"} `
+		for line := range strings.SplitSeq(string(body), "\n") {
+			if v, found := strings.CutPrefix(line, prefix); found {
+				f, err := strconv.ParseFloat(v, 64)
+				if err != nil {
+					t.Fatalf("failed to parse %q: %v", line, err)
+				}
+				return f
+			}
+		}
+		return -1
+	}
+
+	return value("kcp_apiexport_proxy_endpoints"), value("kcp_apiexport_proxy_logical_clusters")
 }
 
 func binding(cluster, name string) *apisv1alpha1.APIBinding {
@@ -154,6 +189,9 @@ func TestSyncEndpointsStartsAndStopsPerURLInformers(t *testing.T) {
 	if len(c.urlBindingInformers) != 0 {
 		t.Fatalf("got %d informers after removing all endpoints, want 0", len(c.urlBindingInformers))
 	}
+	if endpoints, clusters := indexSize(t, "the-slice"); endpoints != 0 || clusters != 0 {
+		t.Fatalf("got %v endpoints and %v logical clusters in the metrics after removing all endpoints, want 0 and 0", endpoints, clusters)
+	}
 }
 
 func TestUpsertAndDeleteBindingIgnoreNonBindings(t *testing.T) {
@@ -250,6 +288,10 @@ func TestControllerAgainstFakeKCP(t *testing.T) {
 	})
 	if err != nil {
 		t.Fatalf("index did not converge: %v", err)
+	}
+
+	if endpoints, clusters := indexSize(t, "the-slice"); endpoints != 2 || clusters != 2 {
+		t.Fatalf("got %v endpoints and %v logical clusters in the metrics, want 2 and 2", endpoints, clusters)
 	}
 
 	cancel()
