@@ -17,7 +17,10 @@ limitations under the License.
 package metrics
 
 import (
+	"context"
 	"net/http"
+	"slices"
+	"strings"
 	"sync"
 
 	"github.com/prometheus/client_golang/prometheus/promhttp"
@@ -27,15 +30,38 @@ import (
 	"k8s.io/klog/v2"
 )
 
+// unknownSlice is the slice label for requests that don't name one of the
+// configured APIExportEndpointSlices, which keeps the label's cardinality
+// bounded no matter what paths clients send.
+const unknownSlice = "unknown"
+
 var requestLatencies = compbasemetrics.NewHistogramVec(
 	&compbasemetrics.HistogramOpts{
-		Name: "apiexport_proxy_request_duration_seconds",
-		Help: "Response latency distribution in seconds for each verb and HTTP response code.",
+		Name: "kcp_apiexport_proxy_request_duration_seconds",
+		Help: "Response latency distribution in seconds for each verb, HTTP response code and APIExportEndpointSlice.",
 		Buckets: []float64{0.05, 0.1, 0.2, 0.4, 0.6, 0.8, 1.0, 1.25, 1.5, 2, 3,
 			4, 5, 6, 8, 10, 15, 20, 30, 45, 60},
 		StabilityLevel: compbasemetrics.ALPHA,
 	},
-	[]string{"method", "code"},
+	[]string{"method", "code", "slice"},
+)
+
+var endpoints = compbasemetrics.NewGaugeVec(
+	&compbasemetrics.GaugeOpts{
+		Name:           "kcp_apiexport_proxy_endpoints",
+		Help:           "Number of shard virtual workspace URLs published by each APIExportEndpointSlice.",
+		StabilityLevel: compbasemetrics.ALPHA,
+	},
+	[]string{"slice"},
+)
+
+var logicalClusters = compbasemetrics.NewGaugeVec(
+	&compbasemetrics.GaugeOpts{
+		Name:           "kcp_apiexport_proxy_logical_clusters",
+		Help:           "Number of logical clusters known for each APIExportEndpointSlice.",
+		StabilityLevel: compbasemetrics.ALPHA,
+	},
+	[]string{"slice"},
 )
 
 var registerMetrics sync.Once
@@ -44,7 +70,7 @@ var registerMetrics sync.Once
 // call multiple times.
 func Register() {
 	registerMetrics.Do(func() {
-		legacyregistry.MustRegister(requestLatencies)
+		legacyregistry.MustRegister(requestLatencies, endpoints, logicalClusters)
 	})
 }
 
@@ -52,9 +78,45 @@ func init() {
 	Register()
 }
 
-// WithLatencyTracking tracks how long the wrapped handler took to complete.
-func WithLatencyTracking(delegate http.Handler) http.Handler {
-	return promhttp.InstrumentHandlerDuration(requestLatencies.HistogramVec, delegate)
+type sliceContextKey struct{}
+
+// WithLatencyTracking tracks how long the wrapped handler took to complete,
+// labelled with the APIExportEndpointSlice named in the request path if it
+// is one of slices.
+func WithLatencyTracking(delegate http.Handler, slices []string) http.Handler {
+	instrumented := promhttp.InstrumentHandlerDuration(requestLatencies.HistogramVec, delegate,
+		promhttp.WithLabelFromCtx("slice", func(ctx context.Context) string {
+			slice, _ := ctx.Value(sliceContextKey{}).(string)
+			return slice
+		}),
+	)
+
+	return http.HandlerFunc(func(w http.ResponseWriter, req *http.Request) {
+		ctx := context.WithValue(req.Context(), sliceContextKey{}, sliceLabel(req.URL.Path, slices))
+		instrumented.ServeHTTP(w, req.WithContext(ctx))
+	})
+}
+
+// sliceLabel returns the slice in a "/apiexportendpointslices/<slice>/..."
+// path if it is one of known, and unknownSlice otherwise.
+func sliceLabel(path string, known []string) string {
+	rest, found := strings.CutPrefix(path, "/apiexportendpointslices/")
+	if !found {
+		return unknownSlice
+	}
+
+	slice, _, _ := strings.Cut(rest, "/")
+	if !slices.Contains(known, slice) {
+		return unknownSlice
+	}
+	return slice
+}
+
+// SetIndexSize records how many shard endpoints and logical clusters the
+// index of the given APIExportEndpointSlice currently knows.
+func SetIndexSize(slice string, endpointCount, clusterCount int) {
+	endpoints.WithLabelValues(slice).Set(float64(endpointCount))
+	logicalClusters.WithLabelValues(slice).Set(float64(clusterCount))
 }
 
 // Handler returns the /metrics HTTP handler.

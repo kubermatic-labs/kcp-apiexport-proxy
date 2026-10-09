@@ -26,9 +26,9 @@ import (
 	"testing"
 )
 
-// teapotRequestCount returns the number of requests with status 418 recorded
-// in the request latency histogram, as exposed by the metrics handler.
-func teapotRequestCount(t *testing.T) int {
+// scrape returns the value of the metric series whose text exposition line
+// starts with series (name plus labels), or 0 if there is none.
+func scrape(t *testing.T, series string) float64 {
 	t.Helper()
 
 	rec := httptest.NewRecorder()
@@ -42,14 +42,13 @@ func teapotRequestCount(t *testing.T) int {
 		t.Fatalf("failed to read metrics: %v", err)
 	}
 
-	const prefix = `apiexport_proxy_request_duration_seconds_count{code="418",method="get"} `
 	for line := range strings.SplitSeq(string(body), "\n") {
-		if value, found := strings.CutPrefix(line, prefix); found {
-			count, err := strconv.Atoi(value)
+		if value, found := strings.CutPrefix(line, series+" "); found {
+			f, err := strconv.ParseFloat(value, 64)
 			if err != nil {
 				t.Fatalf("failed to parse %q: %v", line, err)
 			}
-			return count
+			return f
 		}
 	}
 
@@ -64,21 +63,46 @@ func TestRegisterIsIdempotent(t *testing.T) {
 }
 
 func TestWithLatencyTracking(t *testing.T) {
-	// Use an unusual status code so the series is unique to this test.
+	// Use an unusual status code so the series are unique to this test.
 	handler := WithLatencyTracking(http.HandlerFunc(func(w http.ResponseWriter, _ *http.Request) {
 		w.WriteHeader(http.StatusTeapot)
-	}))
+	}), []string{"slice-a"})
 
-	before := teapotRequestCount(t)
-
-	rec := httptest.NewRecorder()
-	handler.ServeHTTP(rec, httptest.NewRequestWithContext(t.Context(), http.MethodGet, "/clusters/1abc", nil))
-	if rec.Code != http.StatusTeapot {
-		t.Fatalf("got status %d, want %d", rec.Code, http.StatusTeapot)
+	tests := []struct {
+		path      string
+		wantSlice string
+	}{
+		{path: "/apiexportendpointslices/slice-a/clusters/1abc", wantSlice: "slice-a"},
+		{path: "/apiexportendpointslices/not-configured/clusters/1abc", wantSlice: "unknown"},
+		{path: "/something/else", wantSlice: "unknown"},
 	}
 
-	if after := teapotRequestCount(t); after != before+1 {
-		t.Fatalf("got request count %d, want %d", after, before+1)
+	for _, tc := range tests {
+		t.Run(tc.path, func(t *testing.T) {
+			series := `kcp_apiexport_proxy_request_duration_seconds_count{code="418",method="get",slice="` + tc.wantSlice + `"}`
+			before := scrape(t, series)
+
+			rec := httptest.NewRecorder()
+			handler.ServeHTTP(rec, httptest.NewRequestWithContext(t.Context(), http.MethodGet, tc.path, nil))
+			if rec.Code != http.StatusTeapot {
+				t.Fatalf("got status %d, want %d", rec.Code, http.StatusTeapot)
+			}
+
+			if after := scrape(t, series); after != before+1 {
+				t.Fatalf("got request count %v, want %v", after, before+1)
+			}
+		})
+	}
+}
+
+func TestSetIndexSize(t *testing.T) {
+	SetIndexSize("index-test", 2, 5)
+
+	if got := scrape(t, `kcp_apiexport_proxy_endpoints{slice="index-test"}`); got != 2 {
+		t.Fatalf("got %v endpoints, want 2", got)
+	}
+	if got := scrape(t, `kcp_apiexport_proxy_logical_clusters{slice="index-test"}`); got != 5 {
+		t.Fatalf("got %v logical clusters, want 5", got)
 	}
 }
 

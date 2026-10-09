@@ -101,7 +101,7 @@ func NewServer(c CompletedConfig) (*Server, error) {
 			return nil, fmt.Errorf("failed to load serving certificate: %w", err)
 		}
 	}
-	handler = metrics.WithLatencyTracking(handler)
+	handler = metrics.WithLatencyTracking(handler, c.Options.APIExportEndpointSliceNames)
 	handler = withPanicRecovery(handler)
 	handler = accesslog.WithLogging(handler)
 

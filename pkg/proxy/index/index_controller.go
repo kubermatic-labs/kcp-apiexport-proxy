@@ -46,6 +46,8 @@ import (
 	kcpclientset "github.com/kcp-dev/sdk/client/clientset/versioned"
 	kcpclusterclientset "github.com/kcp-dev/sdk/client/clientset/versioned/cluster"
 	apisv1alpha1informers "github.com/kcp-dev/sdk/client/informers/externalversions/apis/v1alpha1"
+
+	"github.com/kubermatic-labs/kcp-apiexport-proxy/pkg/proxy/metrics"
 )
 
 // resyncPeriod is hardcoded rather than exposed as a flag, mirroring
@@ -184,6 +186,8 @@ func (c *Controller) syncEndpoints(slice *apisv1alpha1.APIExportEndpointSlice) {
 			utilruntime.HandleError(fmt.Errorf("failed to start APIBindings watch for endpoint %q: %w", url, err))
 		}
 	}
+
+	c.updateMetricsLocked()
 }
 
 // startURLInformerLocked starts a wildcard APIBindings informer against the
@@ -237,6 +241,7 @@ func (c *Controller) upsertBinding(obj interface{}, url string) {
 	c.lock.Lock()
 	defer c.lock.Unlock()
 	c.clusterURLs[cluster] = url
+	c.updateMetricsLocked()
 }
 
 func (c *Controller) deleteBinding(obj interface{}, url string) {
@@ -256,6 +261,13 @@ func (c *Controller) deleteBinding(obj interface{}, url string) {
 	if c.clusterURLs[cluster] == url {
 		delete(c.clusterURLs, cluster)
 	}
+	c.updateMetricsLocked()
+}
+
+// updateMetricsLocked records the current size of the index. c.lock must be
+// held by the caller.
+func (c *Controller) updateMetricsLocked() {
+	metrics.SetIndexSize(c.sliceName, len(c.urlBindingInformers), len(c.clusterURLs))
 }
 
 // deleteURLLocked removes every index entry pointing at url. c.lock must be

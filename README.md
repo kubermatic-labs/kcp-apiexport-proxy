@@ -77,6 +77,14 @@ Every request to a proxied path is logged at the default log level, with its
 method, path, response status, duration, client address and user agent; the
 `Authorization` header is never logged.
 
+Besides the Go runtime and process metrics, `/metrics` exposes:
+
+| Metric | Description |
+| --- | --- |
+| `kcp_apiexport_proxy_request_duration_seconds` | Histogram of proxied requests by `method`, `code` and `slice` (`unknown` for paths that don't name a configured slice). |
+| `kcp_apiexport_proxy_endpoints` | Shard virtual workspace URLs per `slice`. |
+| `kcp_apiexport_proxy_logical_clusters` | Logical clusters known per `slice`; `0` means requests for that slice will get `404`s. |
+
 Example request:
 
 ```sh
