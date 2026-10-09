@@ -49,6 +49,10 @@ jobs:
         run: echo "$GITHUB_TOKEN" | docker login ghcr.io --username "$GITHUB_ACTOR" --password-stdin
       - run: docker push "$IMAGE:$VERSION"
       - env:
+          REGISTRY_USERNAME: ${{ github.actor }}
+          REGISTRY_PASSWORD: ${{ secrets.GITHUB_TOKEN }}
+        run: ./build/release-chart.sh "$VERSION"
+      - env:
           GH_TOKEN: ${{ secrets.GITHUB_TOKEN }}
         run: |
           gh release create "$VERSION" \
