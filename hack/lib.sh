@@ -40,14 +40,16 @@ echodate() {
 }
 
 # http_get writes the contents of a URL to stdout, using curl if available
-# and falling back to wget otherwise. It fails on HTTP error responses.
+# and falling back to wget otherwise. It retries transient errors and fails
+# on HTTP error responses.
 http_get() {
   local url="$1"
 
   if command -v curl > /dev/null 2>&1; then
-    curl --fail --silent --show-error --location "$url"
+    curl --fail --silent --show-error --location \
+      --retry 5 --retry-all-errors --retry-delay 2 "$url"
   elif command -v wget > /dev/null 2>&1; then
-    wget --quiet --output-document=- "$url"
+    wget --quiet --tries=5 --retry-connrefused --waitretry=2 --output-document=- "$url"
   else
     echodate "Neither curl nor wget is installed, please install one of them." >&2
     return 1
@@ -74,11 +76,14 @@ install_tool() {
     mkdir -p "$TOOLS_DIR"
     local tmp
     tmp="$(mktemp -d)"
+    # Download to a file first, so that a retried download doesn't feed a
+    # partial stream into tar.
+    http_get "$url" > "$tmp/download"
     if [ -n "$member" ]; then
-      http_get "$url" | tar -xz -C "$tmp" "$member"
+      tar -xzf "$tmp/download" -C "$tmp" "$member"
     else
       member="$name"
-      http_get "$url" > "$tmp/$member"
+      mv "$tmp/download" "$tmp/$member"
     fi
     chmod +x "$tmp/$member"
     mv "$tmp/$member" "$target"
