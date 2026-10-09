@@ -28,6 +28,7 @@ import (
 	"k8s.io/client-go/tools/cache"
 	"k8s.io/klog/v2"
 
+	"github.com/kubermatic-labs/kcp-apiexport-proxy/pkg/proxy/accesslog"
 	"github.com/kubermatic-labs/kcp-apiexport-proxy/pkg/proxy/auth"
 	"github.com/kubermatic-labs/kcp-apiexport-proxy/pkg/proxy/filereload"
 	"github.com/kubermatic-labs/kcp-apiexport-proxy/pkg/proxy/index"
@@ -99,6 +100,7 @@ func NewServer(c CompletedConfig) (*Server, error) {
 	}
 	handler = metrics.WithLatencyTracking(handler)
 	handler = withPanicRecovery(handler)
+	handler = accesslog.WithLogging(handler)
 
 	mux := http.NewServeMux()
 	mux.Handle("/metrics", metrics.Handler())

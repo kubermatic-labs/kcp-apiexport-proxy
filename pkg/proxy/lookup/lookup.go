@@ -56,7 +56,7 @@ func newClusterResolveHandler(delegate http.Handler, indexes map[string]index.In
 
 		idx, found := indexes[sliceName]
 		if !found {
-			logger.V(4).Info("unknown APIExportEndpointSlice")
+			logger.Info("unknown APIExportEndpointSlice")
 			http.NotFound(w, req)
 			return
 		}
@@ -65,14 +65,14 @@ func newClusterResolveHandler(delegate http.Handler, indexes map[string]index.In
 			// Only concrete logical cluster names are resolvable; this
 			// proxy does not track workspace paths or serve wildcard
 			// requests.
-			logger.V(4).Info("invalid cluster name")
+			logger.Info("invalid cluster name")
 			http.NotFound(w, req)
 			return
 		}
 
 		endpointURL, found := idx.LookupURL(logicalcluster.Name(clusterName))
 		if !found {
-			logger.V(4).Info("unknown logical cluster")
+			logger.Info("unknown logical cluster")
 			http.NotFound(w, req)
 			return
 		}
@@ -89,7 +89,7 @@ func newClusterResolveHandler(delegate http.Handler, indexes map[string]index.In
 			shardURL.Path += "/" + trail
 		}
 
-		logger.V(4).WithValues("to", shardURL).Info("resolved cluster")
+		logger.WithValues("to", shardURL).Info("resolved cluster")
 
 		req = req.WithContext(WithShardURL(req.Context(), shardURL))
 		delegate.ServeHTTP(w, req)
