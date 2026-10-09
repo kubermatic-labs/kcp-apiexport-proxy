@@ -95,6 +95,27 @@ helm install kcp-apiexport-proxy deploy/charts/kcp-apiexport-proxy \
 A sample Kyverno `ValidatingPolicy` that uses the proxy can be found in
 [config/samples/policy.yaml](config/samples/policy.yaml).
 
+## Releasing
+
+Pushing a tag that starts with `v` (e.g. `v0.1.0`) runs the
+[Release workflow](.github/workflows/release.yaml), which:
+
+1. builds the linux/amd64 binary with the tag as its version,
+2. pushes the image `ghcr.io/kubermatic-labs/kcp-apiexport-proxy:<tag>`,
+3. pushes the Helm chart to `oci://ghcr.io/kubermatic-labs/charts/kcp-apiexport-proxy`
+   with the tag without the `v` as chart version (e.g. `0.1.0`) and the tag
+   as appVersion, so the chart defaults to the matching image
+   ([build/release-chart.sh](build/release-chart.sh)),
+4. creates a GitHub Release with generated notes and the
+   `kcp-apiexport-proxy_<tag>_linux_amd64.tar.gz` archive plus its `.sha256`.
+
+```sh
+git tag v0.1.0
+git push origin v0.1.0
+
+helm install kcp-apiexport-proxy oci://ghcr.io/kubermatic-labs/charts/kcp-apiexport-proxy --version 0.1.0 ...
+```
+
 ## License
 
 Apache License 2.0, see [LICENSE](LICENSE).
