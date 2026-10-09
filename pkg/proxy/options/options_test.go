@@ -32,6 +32,9 @@ func TestNewOptionsDefaults(t *testing.T) {
 	if o.Kubeconfig != "" || len(o.APIExportEndpointSliceNames) != 0 {
 		t.Fatalf("expected kubeconfig and slice names to be empty by default, got %+v", o)
 	}
+	if !reflect.DeepEqual(o.AllowedHTTPMethods, []string{"GET"}) {
+		t.Fatalf("got allowed HTTP methods %v, want [GET]", o.AllowedHTTPMethods)
+	}
 }
 
 func TestAddFlags(t *testing.T) {
@@ -43,6 +46,7 @@ func TestAddFlags(t *testing.T) {
 		"--kubeconfig=/tmp/kubeconfig",
 		"--apiexportendpointslice-names=slice-a,slice-b",
 		"--bind-address=127.0.0.1:9090",
+		"--allowed-http-methods=GET,PATCH",
 		"--token-file=/tmp/token",
 		"--tls-cert-file=/tmp/tls.crt",
 		"--tls-key-file=/tmp/tls.key",
@@ -55,6 +59,7 @@ func TestAddFlags(t *testing.T) {
 		Kubeconfig:                  "/tmp/kubeconfig",
 		APIExportEndpointSliceNames: []string{"slice-a", "slice-b"},
 		BindAddress:                 "127.0.0.1:9090",
+		AllowedHTTPMethods:          []string{"GET", "PATCH"},
 		TokenFile:                   "/tmp/token",
 		TLSCertFile:                 "/tmp/tls.crt",
 		TLSKeyFile:                  "/tmp/tls.key",
@@ -78,6 +83,7 @@ func TestValidate(t *testing.T) {
 		tokenFile  string
 		certFile   string
 		keyFile    string
+		methods    []string
 		wantErrs   int
 	}{
 		{name: "valid", kubeconfig: "/tmp/kubeconfig", sliceNames: []string{"my-slice"}, wantErrs: 0},
@@ -91,6 +97,13 @@ func TestValidate(t *testing.T) {
 		{name: "TLS and token", kubeconfig: "/tmp/kubeconfig", sliceNames: []string{"my-slice"}, tokenFile: "/tmp/token", certFile: "/tmp/tls.crt", keyFile: "/tmp/tls.key", wantErrs: 0},
 		{name: "TLS certificate without key", kubeconfig: "/tmp/kubeconfig", sliceNames: []string{"my-slice"}, certFile: "/tmp/tls.crt", wantErrs: 1},
 		{name: "TLS key without certificate", kubeconfig: "/tmp/kubeconfig", sliceNames: []string{"my-slice"}, keyFile: "/tmp/tls.key", wantErrs: 1},
+		{name: "several methods", kubeconfig: "/tmp/kubeconfig", sliceNames: []string{"my-slice"}, methods: []string{"GET", "POST", "PUT", "PATCH", "DELETE"}, wantErrs: 0},
+		{name: "no methods", kubeconfig: "/tmp/kubeconfig", sliceNames: []string{"my-slice"}, methods: []string{}, wantErrs: 1},
+		{name: "unknown method", kubeconfig: "/tmp/kubeconfig", sliceNames: []string{"my-slice"}, methods: []string{"GET", "FETCH"}, wantErrs: 1},
+		{name: "method not used by Kubernetes", kubeconfig: "/tmp/kubeconfig", sliceNames: []string{"my-slice"}, methods: []string{"HEAD"}, wantErrs: 1},
+		{name: "lowercase method", kubeconfig: "/tmp/kubeconfig", sliceNames: []string{"my-slice"}, methods: []string{"get"}, wantErrs: 1},
+		{name: "method with spaces", kubeconfig: "/tmp/kubeconfig", sliceNames: []string{"my-slice"}, methods: []string{" GET"}, wantErrs: 1},
+		{name: "duplicate method", kubeconfig: "/tmp/kubeconfig", sliceNames: []string{"my-slice"}, methods: []string{"GET", "GET"}, wantErrs: 1},
 		{name: "token without TLS", kubeconfig: "/tmp/kubeconfig", sliceNames: []string{"my-slice"}, tokenFile: "/tmp/token", wantErrs: 0},
 	}
 
@@ -102,6 +115,9 @@ func TestValidate(t *testing.T) {
 			o.TokenFile = tc.tokenFile
 			o.TLSCertFile = tc.certFile
 			o.TLSKeyFile = tc.keyFile
+			if tc.methods != nil {
+				o.AllowedHTTPMethods = tc.methods
+			}
 
 			if errs := o.Validate(); len(errs) != tc.wantErrs {
 				t.Fatalf("got %d errors (%v), want %d", len(errs), errs, tc.wantErrs)

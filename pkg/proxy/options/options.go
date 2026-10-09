@@ -18,6 +18,8 @@ package options
 
 import (
 	"fmt"
+	"net/http"
+	"slices"
 
 	"github.com/spf13/pflag"
 )
@@ -36,6 +38,11 @@ type Options struct {
 	// BindAddress is the address the proxy listens on.
 	BindAddress string
 
+	// AllowedHTTPMethods are the HTTP methods the proxy accepts for proxied
+	// requests. They must be among the methods the Kubernetes API uses,
+	// spelled exactly (e.g. "GET").
+	AllowedHTTPMethods []string
+
 	// TokenFile is the path to a file containing the bearer token clients
 	// must send. If empty, the proxy performs no authentication.
 	TokenFile string
@@ -48,7 +55,8 @@ type Options struct {
 
 func NewOptions() *Options {
 	return &Options{
-		BindAddress: ":8080",
+		BindAddress:        ":8080",
+		AllowedHTTPMethods: []string{"GET"},
 	}
 }
 
@@ -61,6 +69,9 @@ func (o *Options) AddFlags(fs *pflag.FlagSet) {
 			"Requests are proxied under /apiexportendpointslices/<name>/clusters/<logical_cluster>/....")
 	fs.StringVar(&o.BindAddress, "bind-address", o.BindAddress,
 		"The address the proxy listens on.")
+	fs.StringSliceVar(&o.AllowedHTTPMethods, "allowed-http-methods", o.AllowedHTTPMethods,
+		"Comma-separated HTTP methods the proxy accepts for proxied requests; others get a 405. "+
+			"Must be among GET, POST, PUT, PATCH and DELETE, in uppercase.")
 	fs.StringVar(&o.TokenFile, "token-file", o.TokenFile,
 		"The path to a file containing the bearer token clients must send to use the proxied paths. "+
 			"The file is re-read when it changes. Use it together with --tls-cert-file and --tls-key-file, "+
@@ -76,6 +87,15 @@ func (o *Options) Complete() error {
 	return nil
 }
 
+// knownHTTPMethods are the HTTP methods the Kubernetes API uses.
+var knownHTTPMethods = []string{
+	http.MethodGet,
+	http.MethodPost,
+	http.MethodPut,
+	http.MethodPatch,
+	http.MethodDelete,
+}
+
 func (o *Options) Validate() []error {
 	var errs []error
 
@@ -88,6 +108,21 @@ func (o *Options) Validate() []error {
 
 	if (o.TLSCertFile == "") != (o.TLSKeyFile == "") {
 		errs = append(errs, fmt.Errorf("--tls-cert-file and --tls-key-file must be set together"))
+	}
+
+	if len(o.AllowedHTTPMethods) == 0 {
+		errs = append(errs, fmt.Errorf("--allowed-http-methods must not be empty"))
+	}
+
+	seenMethods := make(map[string]bool, len(o.AllowedHTTPMethods))
+	for _, method := range o.AllowedHTTPMethods {
+		switch {
+		case !slices.Contains(knownHTTPMethods, method):
+			errs = append(errs, fmt.Errorf("--allowed-http-methods contains unknown method %q, must be one of %v", method, knownHTTPMethods))
+		case seenMethods[method]:
+			errs = append(errs, fmt.Errorf("--allowed-http-methods contains %q more than once", method))
+		}
+		seenMethods[method] = true
 	}
 
 	seen := make(map[string]bool, len(o.APIExportEndpointSliceNames))

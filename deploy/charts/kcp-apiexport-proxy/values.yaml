@@ -26,6 +26,10 @@ replicas: 2
 # kubeconfig points at. Required.
 apiExportEndpointSliceNames: []
 
+# HTTP methods the proxy accepts for proxied requests; others get a 405.
+allowedHTTPMethods:
+  - GET
+
 kubeconfig:
   # Name of an existing Secret holding the kubeconfig for kcp. Its current
   # context must point at the workspace containing the

@@ -149,6 +149,12 @@ func TestNewServerHandler(t *testing.T) {
 		}
 	}
 
+	rec := httptest.NewRecorder()
+	s.Handler.ServeHTTP(rec, httptest.NewRequestWithContext(t.Context(), http.MethodPost, "/apiexportendpointslices/slice-a/clusters/1abc/api/v1/configmaps", nil))
+	if rec.Code != http.StatusMethodNotAllowed {
+		t.Fatalf("POST: got status %d, want %d", rec.Code, http.StatusMethodNotAllowed)
+	}
+
 	for _, path := range []string{
 		"/apiexportendpointslices/slice-a/clusters/unknown/api/v1/configmaps",
 		"/apiexportendpointslices/slice-a/clusters/2def/api/v1/configmaps",

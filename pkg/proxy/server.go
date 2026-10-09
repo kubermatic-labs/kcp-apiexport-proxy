@@ -32,6 +32,7 @@ import (
 	"github.com/kubermatic-labs/kcp-apiexport-proxy/pkg/proxy/filereload"
 	"github.com/kubermatic-labs/kcp-apiexport-proxy/pkg/proxy/index"
 	"github.com/kubermatic-labs/kcp-apiexport-proxy/pkg/proxy/lookup"
+	"github.com/kubermatic-labs/kcp-apiexport-proxy/pkg/proxy/methods"
 	"github.com/kubermatic-labs/kcp-apiexport-proxy/pkg/proxy/metrics"
 )
 
@@ -69,6 +70,7 @@ func NewServer(c CompletedConfig) (*Server, error) {
 
 	var handler http.Handler = newShardReverseProxy(transport)
 	handler = lookup.WithClusterResolver(handler, indexes)
+	handler = methods.WithAllowed(handler, c.Options.AllowedHTTPMethods)
 
 	if c.Options.TokenFile != "" {
 		tokenFile := filereload.New(c.Options.TokenFile)
