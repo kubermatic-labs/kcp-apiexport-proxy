@@ -24,7 +24,8 @@
 ### kcp-apiexport-proxy-<version>-helm-chart.tar.gz with a .sha256 checksum
 ### file, using the version as chart version and
 ### appVersion. Chart versions must be SemVer, so a version that isn't (e.g.
-### a bare commit hash) is turned into v0.0.0-<version> for the chart.
+### a bare commit hash) is turned into v0.0.0-git-<version> for the chart;
+### the "git-" prefix keeps all-digit hashes like 0950454 valid.
 
 set -euo pipefail
 
@@ -42,13 +43,14 @@ fi
 
 mkdir -p "$BUILD_DEST"
 
+VERSION_VAR="$(go list -m)/pkg/version.Version"
 GOOS="$(go env GOOS)"
 GOARCH="$(go env GOARCH)"
 
 for cmd in "$@"; do
   # shellcheck disable=SC2086
   go build $GOBUILDFLAGS \
-    -ldflags "$LDFLAGS -X github.com/kubermatic-labs/kcp-apiexport-proxy/pkg/version.Version=$VERSION" \
+    -ldflags "$LDFLAGS -X $VERSION_VAR=$VERSION" \
     -o "$BUILD_DEST/$cmd" "./cmd/$cmd"
 
   archive="${cmd}-${VERSION}-${GOOS}-${GOARCH}.tar.gz"
@@ -61,7 +63,7 @@ ensure_helm
 
 CHART_VERSION="$VERSION"
 if ! [[ "$CHART_VERSION" =~ ^v[0-9]+\.[0-9]+\.[0-9]+ ]]; then
-  CHART_VERSION="v0.0.0-$VERSION"
+  CHART_VERSION="v0.0.0-git-$VERSION"
 fi
 
 chart_dir="$(mktemp -d)"

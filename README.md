@@ -98,10 +98,11 @@ A sample Kyverno `ValidatingPolicy` that uses the proxy can be found in
 ## Releasing
 
 Pushing a tag that starts with `v` (e.g. `v0.1.0`) runs the
-[Release workflow](.github/workflows/release.yaml), which:
+[Release workflow](.github/workflows/release.yaml). Below, `$REPO` stands for
+the GitHub repository (`<owner>/<name>`) the workflow runs in. The workflow:
 
 1. builds the linux/amd64 binary with the tag as its version,
-2. pushes the image `ghcr.io/kubermatic-labs/kcp-apiexport-proxy:<tag>`,
+2. pushes the image `ghcr.io/$REPO:<tag>`, linked to the repository,
 3. packages the Helm chart with the tag as both chart version and appVersion,
    so the chart defaults to the matching image,
 4. creates a GitHub Release with generated notes and these assets:
@@ -114,8 +115,8 @@ Pushing a tag that starts with `v` (e.g. `v0.1.0`) runs the
 git tag v0.1.0
 git push origin v0.1.0
 
-curl -LO https://github.com/kubermatic-labs/kcp-apiexport-proxy/releases/download/v0.1.0/kcp-apiexport-proxy-v0.1.0-helm-chart.tar.gz
-helm install kcp-apiexport-proxy ./kcp-apiexport-proxy-v0.1.0-helm-chart.tar.gz ...
+helm install kcp-apiexport-proxy \
+  "https://github.com/$REPO/releases/download/v0.1.0/kcp-apiexport-proxy-v0.1.0-helm-chart.tar.gz" ...
 ```
 
 ## License

@@ -16,8 +16,6 @@
 # static linux kcp-apiexport-proxy binary, as produced by "make build".
 FROM gcr.io/distroless/static-debian12:nonroot
 
-LABEL org.opencontainers.image.source="https://github.com/kubermatic-labs/kcp-apiexport-proxy"
-
 COPY kcp-apiexport-proxy /usr/local/bin/kcp-apiexport-proxy
 
 ENTRYPOINT ["/usr/local/bin/kcp-apiexport-proxy"]
