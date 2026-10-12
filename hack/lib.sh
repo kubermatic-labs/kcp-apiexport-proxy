@@ -19,6 +19,7 @@ TOOLS_DIR="${TOOLS_DIR:-$ROOT_DIR/_output/tools}"
 
 # Pinned tool versions.
 BOILERPLATE_VERSION="0.3.0"
+GH_VERSION="2.102.0"
 GIMPS_VERSION="0.6.2"
 GOLANGCI_LINT_VERSION="2.14.0"
 HELM_VERSION="4.3.0"
@@ -97,6 +98,12 @@ ensure_boilerplate() {
   install_tool boilerplate "$BOILERPLATE_VERSION" \
     "https://github.com/kubermatic-labs/boilerplate/releases/download/v${BOILERPLATE_VERSION}/boilerplate_${BOILERPLATE_VERSION}_${OS}_${ARCH}.tar.gz" \
     "boilerplate_${BOILERPLATE_VERSION}_${OS}_${ARCH}/boilerplate"
+}
+
+ensure_gh() {
+  install_tool gh "$GH_VERSION" \
+    "https://github.com/cli/cli/releases/download/v${GH_VERSION}/gh_${GH_VERSION}_${OS}_${ARCH}.tar.gz" \
+    "gh_${GH_VERSION}_${OS}_${ARCH}/bin/gh"
 }
 
 ensure_gimps() {
