@@ -134,6 +134,18 @@ ensure_kubectl() {
     "https://dl.k8s.io/release/v${KUBECTL_VERSION}/bin/${OS}/${ARCH}/kubectl"
 }
 
+# start_docker_daemon_ci starts Docker inside a Prow job, using the
+# start-docker.sh script of Kubermatic's build image and the registry mirror
+# from the preset-docker-mirror preset. Outside of such a job, where
+# start-docker.sh does not exist, it does nothing.
+start_docker_daemon_ci() {
+  if ! command -v start-docker.sh > /dev/null 2>&1; then
+    return
+  fi
+
+  DOCKER_REGISTRY_MIRROR="${DOCKER_REGISTRY_MIRROR_ADDR:-}" DOCKER_MTU=1400 start-docker.sh
+}
+
 # retry runs the given command until it succeeds, up to the given number of
 # attempts with a two second pause in between.
 #

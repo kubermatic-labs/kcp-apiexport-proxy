@@ -77,6 +77,8 @@ cleanup() {
 }
 trap cleanup EXIT
 
+start_docker_daemon_ci
+
 if ! docker info > /dev/null 2>&1; then
   echodate "Docker is not available, but is required to run kind."
   exit 1

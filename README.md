@@ -39,6 +39,9 @@ by default only accepts `GET` requests (`--allowed-http-methods`).
 Tools needed by the scripts (including kind and kubectl) are downloaded on first use at the pinned
 versions in [hack/lib.sh](hack/lib.sh) into `_output/tools/`.
 
+CI runs on Prow: every pull request runs these four targets as presubmits,
+defined in [.prow/presubmits.yaml](.prow/presubmits.yaml).
+
 ## Usage
 
 ```sh
@@ -115,19 +118,23 @@ A sample Kyverno `ValidatingPolicy` that uses the proxy can be found in
 
 ## Releasing
 
-Pushing a tag that starts with `v` (e.g. `v0.1.0`) runs the
-[Release workflow](.github/workflows/release.yaml). Below, `$REPO` stands for
-the GitHub repository (`<owner>/<name>`) the workflow runs in. The workflow:
+Pushing a tag that starts with `v` (e.g. `v0.1.0`) runs two Prow postsubmits.
+Below, `$REPO` stands for the GitHub repository (`<owner>/<name>`).
 
-1. builds the linux/amd64 binary with the tag as its version,
-2. pushes the image `ghcr.io/$REPO:<tag>`, linked to the repository,
-3. packages the Helm chart with the tag as both chart version and appVersion,
-   so the chart defaults to the matching image,
-4. creates a GitHub Release with generated notes and these assets:
-   - `kcp-apiexport-proxy-<tag>-linux-amd64.tar.gz`, the binary for
-     linux/amd64,
-   - `kcp-apiexport-proxy-<tag>-helm-chart.tar.gz`, the Helm chart,
-   - a `.sha256` checksum file for each of them.
+- `post-kcp-apiexport-proxy-push-image`
+  ([.prow/postsubmits.yaml](.prow/postsubmits.yaml),
+  [release/push-image.sh](release/push-image.sh)) builds the linux/amd64
+  image and pushes it as `quay.io/kubermatic/kcp-apiexport-proxy:<tag>`.
+- `post-kcp-apiexport-proxy-github-release`, defined in the
+  `kubermatic/infra` repository because it needs the bot's GitHub token
+  ([release/github-release.sh](release/github-release.sh)), creates a GitHub
+  Release with generated notes and these assets:
+  - `kcp-apiexport-proxy-<tag>-linux-amd64.tar.gz`, the binary for
+    linux/amd64,
+  - `kcp-apiexport-proxy-<tag>-helm-chart.tar.gz`, the Helm chart, with the
+    tag as both chart version and appVersion, so it defaults to the matching
+    image,
+  - a `.sha256` checksum file for each of them.
 
 ```sh
 git tag v0.1.0
