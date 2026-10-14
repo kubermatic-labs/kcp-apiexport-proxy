@@ -13,7 +13,7 @@
 # limitations under the License.
 
 image:
-  repository: quay.io/kubermatic/kcp-apiexport-proxy
+  repository: quay.io/kubermatic-labs/kcp-apiexport-proxy
   # Defaults to the chart's appVersion.
   tag: ""
   pullPolicy: IfNotPresent

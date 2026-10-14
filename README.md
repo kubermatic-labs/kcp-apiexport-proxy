@@ -124,7 +124,7 @@ Below, `$REPO` stands for the GitHub repository (`<owner>/<name>`).
 - `post-kcp-apiexport-proxy-push-image`
   ([.prow/postsubmits.yaml](.prow/postsubmits.yaml),
   [release/push-image.sh](release/push-image.sh)) builds the linux/amd64
-  image and pushes it as `quay.io/kubermatic/kcp-apiexport-proxy:<tag>`.
+  image and pushes it as `quay.io/kubermatic-labs/kcp-apiexport-proxy:<tag>`.
 - `post-kcp-apiexport-proxy-github-release`, defined in the
   `kubermatic/infra` repository because it needs the bot's GitHub token
   ([release/github-release.sh](release/github-release.sh)), creates a GitHub

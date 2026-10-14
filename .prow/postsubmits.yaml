@@ -22,7 +22,7 @@ postsubmits:
     labels:
       preset-goproxy: "true"
       preset-docker-mirror: "true"
-      preset-docker-push: "true"
+      preset-docker-push-labs: "true"
     spec:
       containers:
         - image: quay.io/kubermatic/build:go-1.26-node-22-kind-0.32-13

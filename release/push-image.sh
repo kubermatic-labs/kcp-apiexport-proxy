@@ -15,7 +15,7 @@
 # limitations under the License.
 
 ### Builds the linux/amd64 image for a tag and pushes it as $IMAGE:<tag>
-### (default quay.io/kubermatic/kcp-apiexport-proxy), labelled with the
+### (default quay.io/kubermatic-labs/kcp-apiexport-proxy), labelled with the
 ### source repository.
 ###
 ### It is run by the post-kcp-apiexport-proxy-push-image Prow job (see
@@ -31,7 +31,7 @@ source hack/lib.sh
 
 VERSION="${PULL_BASE_REF:?PULL_BASE_REF must be set to the tag to release}"
 REPOSITORY="${REPO_OWNER:?REPO_OWNER must be set}/${REPO_NAME:?REPO_NAME must be set}"
-IMAGE="${IMAGE:-quay.io/kubermatic/kcp-apiexport-proxy}"
+IMAGE="${IMAGE:-quay.io/kubermatic-labs/kcp-apiexport-proxy}"
 : "${QUAY_IO_USERNAME:?QUAY_IO_USERNAME must be set}"
 : "${QUAY_IO_PASSWORD:?QUAY_IO_PASSWORD must be set}"
 
