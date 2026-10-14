@@ -1,5 +1,7 @@
 # kcp-apiexport-proxy
 
+TEST
+
 `kcp-apiexport-proxy` is a small reverse proxy that sits in front of the
 shard-specific virtual workspace endpoints of one or more kcp `APIExports`.
 It gives clients (for example Kyverno policies using the
