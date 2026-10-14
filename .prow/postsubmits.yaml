@@ -34,3 +34,79 @@ postsubmits:
             requests:
               cpu: 2
               memory: 2Gi
+
+  - name: post-kcp-apiexport-proxy-build
+    branches:
+      - ^main$
+    decorate: true
+    clone_uri: "ssh://git@github.com/kubermatic-labs/kcp-apiexport-proxy.git"
+    labels:
+      preset-goproxy: "true"
+    spec:
+      containers:
+        - image: quay.io/kubermatic/build:go-1.26-node-22-kind-0.32-13
+          command:
+            - make
+            - build
+          resources:
+            requests:
+              cpu: 2
+              memory: 2Gi
+
+  - name: post-kcp-apiexport-proxy-test
+    branches:
+      - ^main$
+    decorate: true
+    clone_uri: "ssh://git@github.com/kubermatic-labs/kcp-apiexport-proxy.git"
+    labels:
+      preset-goproxy: "true"
+    spec:
+      containers:
+        - image: quay.io/kubermatic/build:go-1.26-node-22-kind-0.32-13
+          command:
+            - make
+            - test
+          resources:
+            requests:
+              cpu: 2
+              memory: 2Gi
+
+  - name: post-kcp-apiexport-proxy-verify
+    branches:
+      - ^main$
+    decorate: true
+    clone_uri: "ssh://git@github.com/kubermatic-labs/kcp-apiexport-proxy.git"
+    labels:
+      preset-goproxy: "true"
+    spec:
+      containers:
+        - image: quay.io/kubermatic/build:go-1.26-node-22-kind-0.32-13
+          command:
+            - make
+            - verify
+          resources:
+            requests:
+              cpu: 2
+              memory: 4Gi
+
+  - name: post-kcp-apiexport-proxy-test-integration
+    branches:
+      - ^main$
+    decorate: true
+    clone_uri: "ssh://git@github.com/kubermatic-labs/kcp-apiexport-proxy.git"
+    labels:
+      preset-goproxy: "true"
+      preset-docker-mirror: "true"
+      preset-kind-volume-mounts: "true"
+    spec:
+      containers:
+        - image: quay.io/kubermatic/build:go-1.26-node-22-kind-0.32-13
+          command:
+            - make
+            - test-integration
+          securityContext:
+            privileged: true
+          resources:
+            requests:
+              cpu: 4
+              memory: 6Gi
