@@ -40,7 +40,9 @@ Tools needed by the scripts (including kind and kubectl) are downloaded on first
 versions in [hack/lib.sh](hack/lib.sh) into `_output/tools/`.
 
 CI runs on Prow: every pull request runs these four targets as presubmits,
-defined in [.prow/presubmits.yaml](.prow/presubmits.yaml).
+defined in [.prow/presubmits.yaml](.prow/presubmits.yaml), and every push to
+`main` runs them again as postsubmits, defined in
+[.prow/postsubmits.yaml](.prow/postsubmits.yaml).
 
 ## Usage
 
