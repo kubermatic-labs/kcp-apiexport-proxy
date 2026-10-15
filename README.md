@@ -127,9 +127,8 @@ Below, `$REPO` stands for the GitHub repository (`<owner>/<name>`).
   ([.prow/postsubmits.yaml](.prow/postsubmits.yaml),
   [release/push-image.sh](release/push-image.sh)) builds the linux/amd64
   image and pushes it as `quay.io/kubermatic-labs/kcp-apiexport-proxy:<tag>`.
-- `post-kcp-apiexport-proxy-github-release`, defined in the
-  `kubermatic/infra` repository because it needs the bot's GitHub token
-  ([release/github-release.sh](release/github-release.sh)), creates a GitHub
+- `post-kcp-apiexport-proxy-github-release`
+  ([release/github-release.sh](release/github-release.sh)) creates a GitHub
   Release with generated notes and these assets:
   - `kcp-apiexport-proxy-<tag>-linux-amd64.tar.gz`, the binary for
     linux/amd64,
@@ -137,6 +136,12 @@ Below, `$REPO` stands for the GitHub repository (`<owner>/<name>`).
     tag as both chart version and appVersion, so it defaults to the matching
     image,
   - a `.sha256` checksum file for each of them.
+
+  This job needs a GitHub token that is only available on a Prow build
+  cluster that jobs defined in this repository can't use, so it is defined in
+  Prow's central job configuration instead of `.prow/`.
+  [release/github-release-postsubmit.yaml](release/github-release-postsubmit.yaml)
+  is a copy of it for reference; changes to it have no effect.
 
 ```sh
 git tag v0.1.0

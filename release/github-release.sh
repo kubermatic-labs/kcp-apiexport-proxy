@@ -19,7 +19,7 @@
 ### Re-running it for an existing release replaces the assets.
 ###
 ### It is run by the post-kcp-apiexport-proxy-github-release Prow job (see
-### kubermatic/infra), which provides the tag in $PULL_BASE_REF, the repository
+### release/github-release-postsubmit.yaml), which provides the tag in $PULL_BASE_REF, the repository
 ### in $REPO_OWNER/$REPO_NAME and a GitHub token in
 ### $KUBERMATIC_BOT_GITHUB_TOKEN. Outside of Prow, set these yourself.
 
