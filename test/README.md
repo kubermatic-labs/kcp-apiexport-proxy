@@ -57,7 +57,10 @@ whose certificate is signed by a custom CA:
 - Plain `http.Get("https://...")` only trusts Kyverno's system CA roots and
   has no option to skip verification.
 
-This is not fixed in Kyverno v1.19.1, the latest release at the time of
+This bug is not fixed in Kyverno v1.19.1, the latest release at the time of
 writing, nor on the SDK's main branch. Until it is, the chart defaults to
 plain HTTP, and the token is sent unencrypted inside the cluster; the proxy
-logs a warning about this at startup.
+logs a warning about this at startup. There is an open issue and PR for it.
+
+- https://github.com/kyverno/sdk/issues/122
+- https://github.com/kyverno/sdk/pull/129
