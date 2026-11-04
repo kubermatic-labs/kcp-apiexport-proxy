@@ -120,7 +120,7 @@ A sample Kyverno `ValidatingPolicy` that uses the proxy can be found in
 
 ## Releasing
 
-Pushing a tag that starts with `v` (e.g. `v0.1.0`) runs two Prow postsubmits.
+Adding a tag that starts with `v` (e.g. `v0.1.0`) runs two Prow postsubmits.
 Below, `$REPO` stands for the GitHub repository (`<owner>/<name>`).
 
 - `post-kcp-apiexport-proxy-push-image`
@@ -142,14 +142,6 @@ Below, `$REPO` stands for the GitHub repository (`<owner>/<name>`).
   Prow's central job configuration instead of `.prow/`.
   [release/github-release-postsubmit.yaml](release/github-release-postsubmit.yaml)
   is a copy of it for reference; changes to it have no effect.
-
-```sh
-git tag v0.1.0
-git push origin v0.1.0
-
-helm install kcp-apiexport-proxy \
-  "https://github.com/$REPO/releases/download/v0.1.0/kcp-apiexport-proxy-v0.1.0-helm-chart.tar.gz" ...
-```
 
 ## License
 
