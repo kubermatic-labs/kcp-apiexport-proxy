@@ -55,6 +55,14 @@ docker build \
   --tag "$IMAGE:$VERSION" \
   "$BUILD_DEST"
 
+echodate "Verifying $IMAGE:$VERSION..."
+want="kcp-apiexport-proxy version $VERSION"
+got="$(docker run --rm --platform linux/amd64 "$IMAGE:$VERSION" --version)"
+if [ "$got" != "$want" ]; then
+  echodate "Expected the image to print \"$want\", but it printed \"$got\"."
+  exit 1
+fi
+
 registry="${IMAGE%%/*}"
 
 # docker_login reads the password from stdin, so it must be piped in again on

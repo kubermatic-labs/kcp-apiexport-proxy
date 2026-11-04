@@ -37,6 +37,9 @@ VERSION="${VERSION:-$(git describe --tags --always --dirty)}"
 GOBUILDFLAGS="${GOBUILDFLAGS:--v}"
 LDFLAGS="${LDFLAGS:--w -extldflags '-static'}"
 
+export CGO_ENABLED="${CGO_ENABLED:-0}"
+export GOFLAGS="${GOFLAGS:--mod=readonly -trimpath}"
+
 if [ "$#" -eq 0 ]; then
   set -- $(ls cmd)
 fi
